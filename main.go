@@ -50,11 +50,11 @@ func init() {
 		pwd, _ := os.Getwd()
 		STORE = pwd + "/" + STORE
 	}
-	LOG.Info("Key/Value Store file: " + STORE)
+	LOG.Info("init", "msg", "Key/Value Store file: " + STORE)
 	var err error
 	DB, err = bolt.Open(STORE, 0600, nil)
 	if err != nil {
-		LOG.Crit(err.Error())
+		LOG.Crit("init", "error", err.Error())
 		panic("Dispatch service is terminating")
 	}
 	err = DB.Update(func(tx *bolt.Tx) error {
@@ -62,7 +62,7 @@ func init() {
 		return err
 	})
 	if err != nil {
-		LOG.Crit(err.Error())
+		LOG.Crit("init", "error", err.Error())
 		panic("Dispatch service is terminating")
 	}
 }
@@ -70,7 +70,7 @@ func init() {
 func main() {
 	r := http.NewServeMux()
 	r.HandleFunc("/", TestHandler)
-	LOG.Crit(http.ListenAndServe(":8000", r).Error())
+	LOG.Crit("main", "error", http.ListenAndServe(":8000", r).Error())
 }
 
 func TestHandler(rw http.ResponseWriter, req *http.Request) {
@@ -83,7 +83,7 @@ func TestHandler(rw http.ResponseWriter, req *http.Request) {
 		TestDELETEHandler(rw, req)
 	default:
 		http.Error(rw, "Invalid request method.", 405)
-		LOG.Error("TestHandler", "Invalid request method")
+		LOG.Error("TestHandler", "error", "Invalid request method")
 	}
 	return
 }
@@ -92,7 +92,7 @@ func TestPOSTHandler(rw http.ResponseWriter, req *http.Request) {
 	k := req.URL.Path
 	v, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		LOG.Error("TestPostHandler", err)
+		LOG.Error("TestPostHandler", "error", err)
 		return
 	}
 	err = DB.Update(func(tx *bolt.Tx) error {
@@ -100,9 +100,9 @@ func TestPOSTHandler(rw http.ResponseWriter, req *http.Request) {
 		return b.Put([]byte(k), v)
 	})
 	if err != nil {
-		LOG.Error("TestPOSTHandler", err)
+		LOG.Error("TestPOSTHandler", "error", err)
 	} else {
-		LOG.Info("TestPOSTHandler", "Successfully created or updated key: "+k)
+		LOG.Info("TestPOSTHandler", "msg", "Successfully created or updated key: "+k)
 	}
 	return
 }
@@ -114,9 +114,9 @@ func TestDELETEHandler(rw http.ResponseWriter, req *http.Request) {
 		return b.Delete([]byte(k))
 	})
 	if err != nil {
-		LOG.Error("TestDELETEHandler", err)
+		LOG.Error("TestDELETEHandler", "error", err)
 	} else {
-		LOG.Info("TestDELETEHandler", "Successfully deleted key: "+k)
+		LOG.Info("TestDELETEHandler", "msg", "Successfully deleted key: "+k)
 	}
 	return
 }
@@ -137,9 +137,9 @@ func TestGETHandler(rw http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 	if err != nil {
-		LOG.Error("TestGETHandler", err)
+		LOG.Error("TestGETHandler", "error", err)
 	} else {
-		LOG.Info("TestGETHandler", "Entry for "+k+" was found")
+		LOG.Info("TestGETHandler", "msg", "Entry for "+k+" was found")
 	}
 	return
 }
