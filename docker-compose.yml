@@ -1,0 +1,12 @@
+web:
+  build: .
+  ports:
+    - "8000:8000"
+  links:
+    - db
+  environment:
+    DISPATCH_DATABASE_SERVER: db
+db:
+  image: mongo:3
+  volumes:
+    - dispatch:/data/db

@@ -5,15 +5,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"github.com/boltdb/bolt"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	log "gopkg.in/inconshreveable/log15.v2"
-	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
-	//"github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 	//apn "github.com/sideshow/apns2"
 	//gcm "https://github.com/kikinteractive/go-gcm"
 )
@@ -28,13 +25,10 @@ const (
 	requestUserIDKey
 )
 
-// Temporary use of boltdb as key/value store
-var STORE string
-
 // Temporary use of global log and db
 // TODO: refactor to move log and storage into context for http handlers to allow mocking out for testing.
 var LOG log.Logger
-var DB *bolt.DB
+var SESSION *mgo.Session
 
 func init() {
 	LOG = log.New("app", "dispatch")
@@ -42,25 +36,11 @@ func init() {
 		log.LvlFilterHandler(
 			log.LvlDebug,
 			log.StreamHandler(os.Stdout, log.JsonFormat())))
-	os.Setenv("DISPATCH_STORE", STORE)
-	if STORE == "" {
-		STORE = "dispatch.bolt"
-	}
-	if !strings.HasPrefix(STORE, "/") {
-		pwd, _ := os.Getwd()
-		STORE = pwd + "/" + STORE
-	}
-	LOG.Info("init", "msg", "Key/Value Store file: " + STORE)
 	var err error
-	DB, err = bolt.Open(STORE, 0600, nil)
-	if err != nil {
-		LOG.Crit("init", "error", err.Error())
-		panic("Dispatch service is terminating")
-	}
-	err = DB.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte("test"))
-		return err
-	})
+
+	server := Getenv("DISPATCH_DATABASE_SERVER", "localhost")
+
+	SESSION, err = mgo.Dial(server)
 	if err != nil {
 		LOG.Crit("init", "error", err.Error())
 		panic("Dispatch service is terminating")
@@ -68,78 +48,37 @@ func init() {
 }
 
 func main() {
-	r := http.NewServeMux()
-	r.HandleFunc("/", TestHandler)
+	r := mux.NewRouter()
+	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
+	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
 	LOG.Crit("main", "error", http.ListenAndServe(":8000", r).Error())
 }
 
-func TestHandler(rw http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case "GET":
-		TestGETHandler(rw, req)
-	case "POST":
-		TestPOSTHandler(rw, req)
-	case "DELETE":
-		TestDELETEHandler(rw, req)
-	default:
-		http.Error(rw, "Invalid request method.", 405)
-		LOG.Error("TestHandler", "error", "Invalid request method")
+func NotificationsList(rw http.ResponseWriter, req *http.Request) {
+	s := SESSION.Copy()
+	defer s.Close()
+	c := Getdb(s).C("notifications")
+	var results []Notification
+
+	user := req.FormValue("user_id")
+	if user != "" {
+		c.Find(bson.M{"keys.user_id": user}).Sort("-notifyafter").All(&results)
 	}
-	return
+	RespondWithJson(rw, results)
 }
 
-func TestPOSTHandler(rw http.ResponseWriter, req *http.Request) {
-	k := req.URL.Path
-	v, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		LOG.Error("TestPostHandler", "error", err)
-		return
-	}
-	err = DB.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("test"))
-		return b.Put([]byte(k), v)
-	})
-	if err != nil {
-		LOG.Error("TestPOSTHandler", "error", err)
-	} else {
-		LOG.Info("TestPOSTHandler", "msg", "Successfully created or updated key: "+k)
-	}
-	return
-}
-
-func TestDELETEHandler(rw http.ResponseWriter, req *http.Request) {
-	k := req.URL.Path
-	err := DB.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("test"))
-		return b.Delete([]byte(k))
-	})
-	if err != nil {
-		LOG.Error("TestDELETEHandler", "error", err)
-	} else {
-		LOG.Info("TestDELETEHandler", "msg", "Successfully deleted key: "+k)
-	}
-	return
-}
-
-func TestGETHandler(rw http.ResponseWriter, req *http.Request) {
-	k := req.URL.Path
-	// WARN: with boltdb if we want to use the value of v outside
-	// the closure then we need to copy it
-	err := DB.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("test"))
-		v := b.Get([]byte(k))
-		if v == nil {
-			http.NotFound(rw, req)
-			return errors.New("Entry for " + k + "was NOT found")
-		} else {
-			fmt.Fprintf(rw, "Value: %s", v)
+func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
+	notificationarray, ok := JsonFromBody(req).([]Notification)
+	if ok && len(notificationarray) > 0 {
+		s := SESSION.Copy()
+		defer s.Close()
+		c := Getdb(s).C("notifications")
+		err := c.Insert(notificationarray)
+		if err != nil {
+			http.Error(rw, "error writing notification to database", http.StatusInternalServerError)
+			panic(err)
 		}
-		return nil
-	})
-	if err != nil {
-		LOG.Error("TestGETHandler", "error", err)
 	} else {
-		LOG.Info("TestGETHandler", "msg", "Entry for "+k+" was found")
+		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
 	}
-	return
 }
