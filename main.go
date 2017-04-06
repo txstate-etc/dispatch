@@ -51,6 +51,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
 	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
+	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
 	LOG.Crit("main", "error", http.ListenAndServe(":8000", r).Error())
 }
 
@@ -58,12 +59,14 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
 	c := Getdb(s).C("notifications")
-	var results []Notification
+	results := make([]Notification, 0)
 
 	user := req.FormValue("user_id")
 	if user != "" {
 		c.Find(bson.M{"keys.user_id": user}).Sort("-notifyafter").All(&results)
-		LOG.Info("fetching notifications", "user_id", user, "results", results)
+	} else {
+		http.Error(rw, "notifications request requires a user id", http.StatusBadRequest)
+		return
 	}
 	RespondWithJson(rw, results)
 }
@@ -87,5 +90,37 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
+	}
+}
+
+func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
+	n := Notification{}
+	JsonFromBody(req, &n)
+	if len(n.Keys) == 0 && len(n.OtherKeys) == 0 {
+		http.Error(rw, "body must be object with keys to use as filters", http.StatusBadRequest)
+		return
+	}
+	if n.Keys["provider_id"] == "" {
+		http.Error(rw, "keys.provider_id is required for all deletions", http.StatusBadRequest)
+		return
+	}
+
+	filters := bson.M{}
+	for key,val := range n.Keys {
+		filters["keys."+key] = val
+	}
+	for key,val := range n.OtherKeys {
+		filters["otherkeys."+key] = val
+	}
+
+	LOG.Info("parsed body for delete", "filters", filters)
+
+	s := SESSION.Copy()
+	defer s.Close()
+	c := Getdb(s).C("notifications")
+	_, err := c.RemoveAll(filters)
+	if err != nil {
+		http.Error(rw, "database error while deleting notifications", http.StatusInternalServerError)
+		panic(err)
 	}
 }

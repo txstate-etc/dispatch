@@ -12,6 +12,6 @@ type Notification struct {
 	ContentHash string `json:"content_hash"`
 	SendUpdates bool `json:"send_updates"`
 	NotifyAfter JsonTime `json:"notify_after"`
-	Keys interface{} `json:"keys"`
-	OtherKeys interface{} `json:"other_keys"`
+	Keys map[string]string `json:"keys"`
+	OtherKeys map[string]string `json:"other_keys"`
 }
