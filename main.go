@@ -63,17 +63,24 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 	user := req.FormValue("user_id")
 	if user != "" {
 		c.Find(bson.M{"keys.user_id": user}).Sort("-notifyafter").All(&results)
+		LOG.Info("fetching notifications", "user_id", user, "results", results)
 	}
 	RespondWithJson(rw, results)
 }
 
 func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
-	notificationarray, ok := JsonFromBody(req).([]Notification)
-	if ok && len(notificationarray) > 0 {
+	notificationarray := make([]Notification, 0)
+	JsonFromBody(req, &notificationarray)
+	LOG.Info("parsed body", "notificationarray", notificationarray)
+	if len(notificationarray) > 0 {
 		s := SESSION.Copy()
 		defer s.Close()
 		c := Getdb(s).C("notifications")
-		err := c.Insert(notificationarray)
+		b := c.Bulk()
+		for _,n := range notificationarray {
+			b.Insert(n)
+		}
+		_, err := b.Run()
 		if err != nil {
 			http.Error(rw, "error writing notification to database", http.StatusInternalServerError)
 			panic(err)

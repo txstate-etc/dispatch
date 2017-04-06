@@ -24,15 +24,13 @@ func RespondWithJson(rw http.ResponseWriter, p interface{}) {
 	json.NewEncoder(rw).Encode(p)
 }
 
-func JsonFromBody(req *http.Request) interface{} {
+func JsonFromBody(req *http.Request, ret interface{}) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		panic(err)
 	}
-	var ret interface{}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
