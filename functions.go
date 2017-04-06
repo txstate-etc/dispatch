@@ -5,6 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/certificate"
+	"github.com/sideshow/apns2/payload"
+	//gcm "https://github.com/kikinteractive/go-gcm"
 )
 
 func Getenv(key string, def string) string {
@@ -33,4 +37,24 @@ func JsonFromBody(req *http.Request, ret interface{}) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func SendAppleNotification(token string, topic string, badge int, n Notification) {
+	cert, err := certificate.FromPemFile("/certs/edu.txstate.mobile.tracs.ios.pem", "")
+	if err != nil {
+		LOG.Crit("Certificate Error", "error", err)
+		return
+	}
+	notification := &apns2.Notification{}
+	notification.DeviceToken = token
+	notification.Topic = topic
+	notification.Payload = payload.NewPayload().Alert("You have a new notification.").Badge(badge)
+
+	client := apns2.NewClient(cert).Development()
+	res, err := client.Push(notification)
+	if err != nil {
+		LOG.Crit("Failed to push notification to Apple", err)
+		return
+	}
+	LOG.Info("successfully pushed to Apple", "statusCode", res.StatusCode, "ApnsID", res.ApnsID, "Reason", res.Reason)
 }

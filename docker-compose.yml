@@ -4,6 +4,8 @@ web:
     - "8000:8000"
   links:
     - db
+  volumes:
+    - ./certs:/certs
   environment:
     DISPATCH_DATABASE_SERVER: db
 db:

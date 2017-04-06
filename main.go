@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"os"
 	"github.com/gorilla/mux"
-	//apn "github.com/sideshow/apns2"
-	//gcm "https://github.com/kikinteractive/go-gcm"
 )
 
 type key int
@@ -87,6 +85,9 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			http.Error(rw, "error writing notification to database", http.StatusInternalServerError)
 			panic(err)
+		}
+		for _,n := range notificationarray {
+			SendAppleNotification("", "edu.txstate.mobile.tracs", 3, n)
 		}
 	} else {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
