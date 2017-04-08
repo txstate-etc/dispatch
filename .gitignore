@@ -1,2 +1,4 @@
 certs/
+vendor/
+Godeps/
 .DS_Store

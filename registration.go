@@ -1,10 +1,10 @@
 package main
 
 type Registration struct {
-	UserID string `json:"user_id"`
 	Platform PlatformType `json:"platform"`
+	AppID string `bson:"app_id" json:"app_id"`
 	Token string `json:"token"`
-	AppID string `json:"app_id"`
+	UserID string `bson:"user_id" json:"user_id"`
 }
 
 type PlatformType string

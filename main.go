@@ -5,12 +5,12 @@
 package main
 
 import (
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
-	log "gopkg.in/inconshreveable/log15.v2"
 	"net/http"
 	"os"
+	"gopkg.in/mgo.v2"
+	log "gopkg.in/inconshreveable/log15.v2"
 	"github.com/gorilla/mux"
+	"github.com/sideshow/apns2"
 )
 
 type key int
@@ -27,6 +27,7 @@ const (
 // TODO: refactor to move log and storage into context for http handlers to allow mocking out for testing.
 var LOG log.Logger
 var SESSION *mgo.Session
+var APNSMANAGER *apns2.ClientManager
 
 func init() {
 	LOG = log.New("app", "dispatch")
@@ -43,6 +44,8 @@ func init() {
 		LOG.Crit("init", "error", err.Error())
 		panic("Dispatch service is terminating")
 	}
+
+	APNSMANAGER = apns2.NewClientManager()
 }
 
 func main() {
@@ -53,75 +56,72 @@ func main() {
 	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
-	LOG.Crit("main", "error", http.ListenAndServe(":8000", r).Error())
+	for {
+		err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
+		LOG.Crit("request panicked", "error", err)
+	}
 }
 
 func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
-	c := Getdb(s).C("notifications")
-	results := make([]Notification, 0)
+	db := Getdb(s)
 
 	user := req.FormValue("user_id")
 	if user != "" {
-		c.Find(bson.M{"keys.user_id": user}).Sort("-notifyafter").All(&results)
+		results, err := GetNotificationsForUser(db, user)
+		if err != nil {
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+		RespondWithJson(rw, results)
 	} else {
 		http.Error(rw, "notifications request requires a user id", http.StatusBadRequest)
 		return
 	}
-	RespondWithJson(rw, results)
 }
 
 func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	notificationarray := make([]Notification, 0)
 	JsonFromBody(req, &notificationarray)
-	LOG.Info("parsed body", "notificationarray", notificationarray)
 	if len(notificationarray) > 0 {
 		s := SESSION.Copy()
 		defer s.Close()
 		db := Getdb(s)
 		c := db.C("notifications")
 		b := c.Bulk()
+
 		for _,n := range notificationarray {
 			b.Insert(n)
 		}
 		_, err := b.Run()
 		if err != nil {
-			http.Error(rw, "error writing notification to database", http.StatusInternalServerError)
+			http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
 			panic(err)
 		}
-		for _,n := range notificationarray {
-			ConditionallySendNotification(db, n)
-		}
+
+		SendNotificationArray(db, notificationarray)
 	} else {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
 	}
 }
 
 func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
-	n := Notification{}
-	JsonFromBody(req, &n)
-	if len(n.Keys) == 0 && len(n.OtherKeys) == 0 {
-		http.Error(rw, "body must be object with keys to use as filters", http.StatusBadRequest)
+	nf := NotificationFilter{}
+	JsonFromBody(req, &nf)
+	if len(nf.Keys) == 0 && len(nf.OtherKeys) == 0 {
+		http.Error(rw, "body must be JSON object with keys to use as filters", http.StatusBadRequest)
 		return
 	}
-	if n.Keys["provider_id"] == "" {
+	if nf.Keys["provider_id"] == "" {
 		http.Error(rw, "keys.provider_id is required for all deletions", http.StatusBadRequest)
 		return
 	}
-
-	filters := bson.M{}
-	for key,val := range n.Keys {
-		filters["keys."+key] = val
-	}
-	for key,val := range n.OtherKeys {
-		filters["otherkeys."+key] = val
-	}
-
 	s := SESSION.Copy()
 	defer s.Close()
-	c := Getdb(s).C("notifications")
-	_, err := c.RemoveAll(filters)
+	db := Getdb(s)
+
+	err := DeleteNotifications(db, nf)
 	if err != nil {
 		http.Error(rw, "database error while deleting notifications", http.StatusInternalServerError)
 		panic(err)
@@ -131,17 +131,20 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
-	c := Getdb(s).C("registrations")
-	results := make([]Registration, 0)
+	db := Getdb(s)
 
 	user := req.FormValue("user_id")
 	if user != "" {
-		c.Find(bson.M{"userid": user}).All(&results)
+		results, err := GetRegistrationsForUser(db, user)
+		if err != nil {
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+		RespondWithJson(rw, results)
 	} else {
 		http.Error(rw, "registrations request requires a user id", http.StatusBadRequest)
 		return
 	}
-	RespondWithJson(rw, results)
 }
 
 func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
@@ -159,8 +162,8 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
-	c := db.C("registrations")
-	_,err = c.Upsert(bson.M{"token":reg.Token}, reg)
+
+	err = SaveRegistration(db, reg)
 	if err != nil {
 		http.Error(rw, "database error while upserting registration", http.StatusInternalServerError)
 		panic(err)
