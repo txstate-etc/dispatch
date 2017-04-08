@@ -50,6 +50,9 @@ func main() {
 	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
 	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
 	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
+	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
+	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
+	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
 	LOG.Crit("main", "error", http.ListenAndServe(":8000", r).Error())
 }
 
@@ -115,8 +118,6 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 		filters["otherkeys."+key] = val
 	}
 
-	LOG.Info("parsed body for delete", "filters", filters)
-
 	s := SESSION.Copy()
 	defer s.Close()
 	c := Getdb(s).C("notifications")
@@ -125,4 +126,47 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "database error while deleting notifications", http.StatusInternalServerError)
 		panic(err)
 	}
+}
+
+func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
+	s := SESSION.Copy()
+	defer s.Close()
+	c := Getdb(s).C("registrations")
+	results := make([]Registration, 0)
+
+	user := req.FormValue("user_id")
+	if user != "" {
+		c.Find(bson.M{"userid": user}).All(&results)
+	} else {
+		http.Error(rw, "registrations request requires a user id", http.StatusBadRequest)
+		return
+	}
+	RespondWithJson(rw, results)
+}
+
+func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
+	reg := Registration{}
+	err := JsonFromBody(req, &reg)
+	if err != nil {
+		http.Error(rw, "registration body must be JSON", http.StatusBadRequest)
+		return
+	}
+	if len(reg.Token) == 0 || len(reg.UserID) == 0 || len(reg.Platform) == 0 || len(reg.AppID) == 0 {
+		http.Error(rw, "registration requires a device token, user id, platform and app id", http.StatusBadRequest)
+		return
+	}
+	LOG.Info("parsed registration body", "reg", reg)
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+	c := db.C("registrations")
+	_,err = c.Upsert(bson.M{"token":reg.Token}, reg)
+	if err != nil {
+		http.Error(rw, "database error while upserting registration", http.StatusInternalServerError)
+		panic(err)
+	}
+}
+
+func RegistrationsDelete(rw http.ResponseWriter, req *http.Request) {
+
 }

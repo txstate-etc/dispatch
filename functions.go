@@ -30,20 +30,21 @@ func RespondWithJson(rw http.ResponseWriter, p interface{}) {
 	json.NewEncoder(rw).Encode(p)
 }
 
-func JsonFromBody(req *http.Request, ret interface{}) {
+func JsonFromBody(req *http.Request, ret interface{}) error {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func getRegistrationsForUser(db *mgo.Database, uid string) *[]Registration {
 	results := make([]Registration, 0)
-	db.C("registrations").Find(bson.M{"user_id":uid}).All(&results)
+	db.C("registrations").Find(bson.M{"userid":uid}).All(&results)
 	return &results
 }
 
@@ -69,7 +70,7 @@ func SendNotification(db *mgo.Database, n Notification, badge int) {
 }
 
 func SendAppleNotification(reg Registration, badge int, n Notification) error {
-	cert, err := certificate.FromPemFile("/certs/"+reg.AppID+".ios.pem", "")
+	cert, err := certificate.FromPemFile("/certs/ios/"+reg.AppID+".pem", "")
 	if err != nil {
 		LOG.Crit("Certificate Error", "error", err, "registration", reg)
 		return err
