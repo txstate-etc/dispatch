@@ -76,7 +76,8 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	if len(notificationarray) > 0 {
 		s := SESSION.Copy()
 		defer s.Close()
-		c := Getdb(s).C("notifications")
+		db := Getdb(s)
+		c := db.C("notifications")
 		b := c.Bulk()
 		for _,n := range notificationarray {
 			b.Insert(n)
@@ -87,7 +88,7 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 			panic(err)
 		}
 		for _,n := range notificationarray {
-			SendAppleNotification("", "edu.txstate.mobile.tracs", 3, n)
+			ConditionallySendNotification(db, n)
 		}
 	} else {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
