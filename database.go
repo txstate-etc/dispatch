@@ -1,5 +1,6 @@
 package main
 import (
+	"time"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -12,10 +13,16 @@ func GetAllAppFilters(db *mgo.Database) []AppFilter {
 	results := make([]AppFilter, 0)
 
 	// TEMPORARY: hack in our configuration
-	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Keys: map[string]string{"provider_id":"tracs"}})
+	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{ NotificationFilter{Keys: map[string]string{"provider_id":"tracs"}} }})
 	//db.C("appfilters").Find().All(&results)
 
 	return results
+}
+
+func GetNotificationsUnsent(db *mgo.Database) ([]Notification, error) {
+	results := make([]Notification, 0)
+	err := db.C("notifications").Find(bson.M{"sent": false, "notify_after": bson.M{"$lt": time.Now()}}).All(&results)
+	return results, err
 }
 
 func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, error) {
@@ -59,5 +66,17 @@ func MarkNotificationSent(db *mgo.Database, n Notification) {
 
 func SaveRegistration(db *mgo.Database, reg Registration) error {
 	_,err := db.C("registrations").Upsert(bson.M{"token":reg.Token}, reg)
+	return err
+}
+
+func DeleteRegistrationWithNewSession(reg Registration) error {
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+	return DeleteRegistration(db, reg)
+}
+
+func DeleteRegistration(db *mgo.Database, reg Registration) error {
+	err := db.C("registrations").Remove(bson.M{"token":reg.Token})
 	return err
 }

@@ -12,6 +12,21 @@ import (
 	//gcm "https://github.com/kikinteractive/go-gcm"
 )
 
+func LoopForNotificationsToSend(seconds time.Duration) {
+	s := SESSION.Copy()
+	defer s.Close()
+	for {
+		s.Refresh()
+		db := Getdb(s)
+		notificationarray, err := GetNotificationsUnsent(db)
+		if err != nil {
+			SendNotificationArray(db, notificationarray)
+		}
+
+		time.Sleep(seconds)
+	}
+}
+
 func Getenv(key string, def string) string {
 	ret := os.Getenv(key)
 	if len(ret) == 0 {
@@ -37,7 +52,7 @@ func JsonFromBody(req *http.Request, ret interface{}) error {
 	return nil
 }
 
-func IsInterestedInNotification(filter AppFilter, n Notification) bool {
+func NotificationFilterMatches(filter NotificationFilter, n Notification) bool {
 	for key,val := range filter.Keys {
 		if val != n.Keys[key] {
 			return false
@@ -53,9 +68,11 @@ func IsInterestedInNotification(filter AppFilter, n Notification) bool {
 
 func GetAppsInterestedInNotification(appfilters []AppFilter, n Notification) map[string]bool {
 	ret := make(map[string]bool)
-	for _,filter := range appfilters {
-		if IsInterestedInNotification(filter, n) {
-			ret[filter.AppID] = true
+	for _,appfilter := range appfilters {
+		for _,filter := range appfilter.Whitelist {
+			if NotificationFilterMatches(filter, n) {
+				ret[appfilter.AppID] = true
+			}
 		}
 	}
 	return ret
@@ -66,7 +83,15 @@ func FilterRegistrationsForNotification(registrations []Registration, appfilters
 	ret := make([]Registration, 0)
 	for _,reg := range registrations {
 		if apphash[reg.AppID] {
-			ret = append(ret, reg)
+			blacklisted := false
+			for _,filter := range reg.Blacklist {
+				if NotificationFilterMatches(filter, n) {
+					blacklisted = true
+				}
+			}
+			if !blacklisted {
+				ret = append(ret, reg)
+			}
 		}
 	}
 	return ret
@@ -125,6 +150,9 @@ func SendAppleNotification(reg Registration, n Notification, badge int) error {
 	if err != nil {
 		LOG.Crit("Failed to push notification to Apple", err, "registration", reg, "notification", n)
 		return err
+	}
+	if res.StatusCode == http.StatusGone { // apple is telling us the device is no longer registered
+		DeleteRegistrationWithNewSession(reg)
 	}
 	LOG.Info("successfully pushed to Apple", "n", n, "statusCode", res.StatusCode, "ApnsID", res.ApnsID, "Reason", res.Reason)
 	return nil

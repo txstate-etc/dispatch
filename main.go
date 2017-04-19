@@ -7,6 +7,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"time"
 	"gopkg.in/mgo.v2"
 	log "gopkg.in/inconshreveable/log15.v2"
 	"github.com/gorilla/mux"
@@ -49,6 +50,7 @@ func init() {
 }
 
 func main() {
+	go LoopForNotificationsToSend(1*time.Second)
 	r := mux.NewRouter()
 	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
 	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
@@ -171,5 +173,14 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 }
 
 func RegistrationsDelete(rw http.ResponseWriter, req *http.Request) {
-
+	token := req.FormValue("token")
+	if token != "" {
+		s := SESSION.Copy()
+		defer s.Close()
+		db := Getdb(s)
+		DeleteRegistration(db, Registration{Token: token})
+	} else {
+		http.Error(rw, "registration deletion requires a device token", http.StatusBadRequest)
+		return
+	}
 }

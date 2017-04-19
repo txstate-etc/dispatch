@@ -13,7 +13,7 @@ type Notification struct {
 	Message string `json:"message"`
 	ContentHash string `json:"content_hash"`
 	SendUpdates bool `json:"send_updates"`
-	NotifyAfter JsonTime `json:"notify_after"`
+	NotifyAfter JsonTime `json:"notify_after" bson:"notify_after"`
 	Keys map[string]string `json:"keys"`
 	OtherKeys map[string]string `json:"other_keys"`
 }
