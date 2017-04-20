@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 	"time"
-	"gopkg.in/mgo.v2"
+	"github.com/globalsign/mgo"
 	log "gopkg.in/inconshreveable/log15.v2"
 	"github.com/gorilla/mux"
 	"github.com/sideshow/apns2"
@@ -86,25 +86,21 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	notificationarray := make([]Notification, 0)
 	JsonFromBody(req, &notificationarray)
-	if len(notificationarray) > 0 {
-		s := SESSION.Copy()
-		defer s.Close()
-		db := Getdb(s)
-		c := db.C("notifications")
-		b := c.Bulk()
-
-		for _,n := range notificationarray {
-			b.Insert(n)
-		}
-		_, err := b.Run()
-		if err != nil {
-			http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
-			panic(err)
-		}
-
-		SendNotificationArray(db, notificationarray)
-	} else {
+	if len(notificationarray) == 0 {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
+		return
+	}
+
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	merged := MergeNotifications(db, notificationarray)
+
+	err := SaveNotifications(db, merged)
+	if err != nil {
+		http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
+		panic(err)
 	}
 }
 

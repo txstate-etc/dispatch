@@ -1,8 +1,8 @@
 package main
 import (
 	"time"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 )
 
 func Getdb(s *mgo.Session) *mgo.Database {
@@ -13,21 +13,37 @@ func GetAllAppFilters(db *mgo.Database) []AppFilter {
 	results := make([]AppFilter, 0)
 
 	// TEMPORARY: hack in our configuration
-	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{ NotificationFilter{Keys: map[string]string{"provider_id":"tracs"}} }})
+	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{NotificationFilter{Keys: map[string]string{"provider_id":"tracs"}}}})
 	//db.C("appfilters").Find().All(&results)
 
 	return results
 }
 
+func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
+	result := Notification{}
+	c := db.C("notifications")
+	c.EnsureIndexKey(MapKeys(n.Keys)...)
+	err := c.Find(n.Keys).Sort("-notify_after").One(&result)
+	return result, err
+}
+
 func GetNotificationsUnsent(db *mgo.Database) ([]Notification, error) {
 	results := make([]Notification, 0)
-	err := db.C("notifications").Find(bson.M{"sent": false, "notify_after": bson.M{"$lt": time.Now()}}).All(&results)
+	c := db.C("notifications")
+	idx := mgo.Index{
+		Key: []string{"notify_after"},
+		PartialFilter: bson.M{"sent":false},
+	}
+	c.EnsureIndex(idx)
+	err := c.Find(bson.M{"sent": false, "notify_after": bson.M{"$lt": time.Now()}}).All(&results)
 	return results, err
 }
 
 func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, error) {
 	results := make([]Notification, 0)
-	err := db.C("notifications").Find(bson.M{"keys.user_id": user}).Sort("-notifyafter").All(&results)
+	c := db.C("notifications")
+	c.EnsureIndexKey("keys.user_id")
+	err := c.Find(bson.M{"keys.user_id": user}).Sort("-notify_after").All(&results)
 	return results, err
 }
 
@@ -57,6 +73,15 @@ func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 	}
 
 	_, err := db.C("notifications").RemoveAll(filters)
+	return err
+}
+
+func SaveNotifications(db *mgo.Database, notificationarray []Notification) error {
+	b := db.C("notifications").Bulk()
+	for _,n := range notificationarray {
+		b.Upsert(bson.M{"_id": n.ID}, n)
+	}
+	_, err := b.Run()
 	return err
 }
 

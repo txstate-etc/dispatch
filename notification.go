@@ -1,6 +1,6 @@
 package main
 import (
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo/bson"
 )
 
 type Notification struct {
@@ -9,8 +9,10 @@ type Notification struct {
 	Seen bool `json:"seen"`
 	Read bool `json:"read"`
 	Cleared bool `json:"cleared"`
+	IsUpdate bool `json:"is_update" bson:"is_update"`
 	Errors bool `json:"errors"`
 	Message string `json:"message"`
+	UpdatedMessage string `json:"updated_message"`
 	ContentHash string `json:"content_hash"`
 	SendUpdates bool `json:"send_updates"`
 	NotifyAfter JsonTime `json:"notify_after" bson:"notify_after"`

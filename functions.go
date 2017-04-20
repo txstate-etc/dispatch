@@ -4,8 +4,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"time"
-	"gopkg.in/mgo.v2"
+	"github.com/globalsign/mgo"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
 	"github.com/sideshow/apns2/payload"
@@ -35,6 +36,19 @@ func Getenv(key string, def string) string {
 	return ret
 }
 
+func MapKeys(mymap interface{}) []string {
+	v := reflect.ValueOf(mymap)
+	if v.Kind() == reflect.Map {
+		rkeys := v.MapKeys()
+		ret := make([]string, len(rkeys))
+		for _,kv := range rkeys {
+			ret = append(ret, kv.String())
+		}
+		return ret
+	}
+	return []string{}
+}
+
 func RespondWithJson(rw http.ResponseWriter, p interface{}) {
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(p)
@@ -50,6 +64,43 @@ func JsonFromBody(req *http.Request, ret interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
+	result, err := GetNotificationDupe(db, n)
+	if err != nil {
+		LOG.Crit("lost a notification because database was down")
+		return Notification{}, true
+	}
+
+	killnotification := false
+	if result.ID != "" { // found a duplicate
+		if result.Sent { // the older one has already gone out
+			if result.ContentHash == n.ContentHash { // content has not changed
+				killnotification = true // no new notification
+			} else { // content has changed
+				if n.SendUpdates { // notification source wants update messages to go out
+					n.IsUpdate = true // send it but as an update
+				} else { // notification source does not want update messages to go out
+					killnotification = true // squelch the notification
+				}
+			}
+		} else { // the older one has not gone out
+			n.ID = result.ID // update the older notification with new data
+		}
+	}
+	return n, killnotification
+}
+
+func MergeNotifications(db *mgo.Database, notificationarray []Notification) []Notification {
+	ret := []Notification{}
+	for _,n := range notificationarray {
+		m,kill := MergeNotification(db, n)
+		if !kill {
+			ret = append(ret, m)
+		}
+	}
+	return ret
 }
 
 func NotificationFilterMatches(filter NotificationFilter, n Notification) bool {
