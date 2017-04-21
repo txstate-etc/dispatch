@@ -58,6 +58,7 @@ func main() {
 	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
+	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
 	for {
 		err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
 		LOG.Crit("request panicked", "error", err)
@@ -147,6 +148,27 @@ func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "registrations request requires a user id", http.StatusBadRequest)
 		return
 	}
+}
+
+func RegistrationsGet(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	token := vars["token"]
+
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	reg, err := GetRegistration(db, token)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			rw.WriteHeader(http.StatusNotFound)
+		} else {
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+	}
+
+	RespondWithJson(rw, reg)
 }
 
 func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
