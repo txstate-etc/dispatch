@@ -21,7 +21,12 @@ func LoopForNotificationsToSend(seconds time.Duration) {
 		db := Getdb(s)
 		notificationarray, err := GetNotificationsUnsent(db)
 		if err != nil {
-			SendNotificationArray(db, notificationarray)
+			LOG.Crit("could not retrieve unsent notifications from database", "err", err)
+		} else {
+			err = SendNotificationArray(db, notificationarray)
+			if err != nil {
+				LOG.Crit("problem sending notification array", "err", err)
+			}
 		}
 
 		time.Sleep(seconds)
@@ -117,12 +122,41 @@ func NotificationFilterMatches(filter NotificationFilter, n Notification) bool {
 	return true
 }
 
+func AppIsInterestedInNotification(appfilter AppFilter, n Notification) bool {
+	for _,filter := range appfilter.Whitelist {
+		if NotificationFilterMatches(filter, n) {
+			return true
+		}
+	}
+	return false
+}
+
+func RegistrationIsInterestedInNotification(reg Registration, n Notification) bool {
+	blacklisted := false
+	for _,filter := range reg.Blacklist {
+		if NotificationFilterMatches(filter, n) {
+			blacklisted = true
+		}
+	}
+	return !blacklisted
+}
+
 func GetAppsInterestedInNotification(appfilters []AppFilter, n Notification) map[string]bool {
 	ret := make(map[string]bool)
 	for _,appfilter := range appfilters {
-		for _,filter := range appfilter.Whitelist {
-			if NotificationFilterMatches(filter, n) {
-				ret[appfilter.AppID] = true
+		if AppIsInterestedInNotification(appfilter, n) {
+			ret[appfilter.AppID] = true
+		}
+	}
+	return ret
+}
+
+func FilterNotificationsForRegistration(notifications []Notification, appfilter AppFilter, reg Registration) []Notification {
+	ret := []Notification{}
+	for _,n := range notifications {
+		if AppIsInterestedInNotification(appfilter, n) {
+			if RegistrationIsInterestedInNotification(reg, n) {
+				ret = append(ret, n)
 			}
 		}
 	}
@@ -133,14 +167,8 @@ func FilterRegistrationsForNotification(registrations []Registration, appfilters
 	apphash := GetAppsInterestedInNotification(appfilters, n)
 	ret := make([]Registration, 0)
 	for _,reg := range registrations {
-		if apphash[reg.AppID] {
-			blacklisted := false
-			for _,filter := range reg.Blacklist {
-				if NotificationFilterMatches(filter, n) {
-					blacklisted = true
-				}
-			}
-			if !blacklisted {
+		if apphash[reg.AppID] { // application is interested
+			if RegistrationIsInterestedInNotification(reg, n) {
 				ret = append(ret, reg)
 			}
 		}
@@ -150,13 +178,19 @@ func FilterRegistrationsForNotification(registrations []Registration, appfilters
 
 // function for sending a whole array of notifications, bundles up database calls to
 // avoid n+1 problems
-func SendNotificationArray(db *mgo.Database, notificationarray []Notification) {
+func SendNotificationArray(db *mgo.Database, notificationarray []Notification) error {
 	userids := make([]string,len(notificationarray))
 	for _,n := range notificationarray {
 		userids = append(userids, n.Keys["user_id"])
 	}
-	registrations := GetRegistrationsForUsers(db, userids)
-	appfilters := GetAllAppFilters(db)
+	registrations, err := GetRegistrationsForUsers(db, userids)
+	if err != nil {
+		return err
+	}
+	appfilters, err := GetAllAppFilters(db)
+	if err != nil {
+		return err
+	}
 
 	for _,n := range notificationarray {
 		regsforuser := registrations[n.Keys["user_id"]]
@@ -166,6 +200,7 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) {
 			MarkNotificationSent(db, n)
 		}
 	}
+	return nil
 }
 
 // send a single notification to all registered apps, no more database calls at this point

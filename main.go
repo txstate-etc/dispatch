@@ -70,17 +70,22 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 	db := Getdb(s)
 
 	user := req.FormValue("user_id")
+	token := req.FormValue("token")
+	var results []Notification
+	var err error
 	if user != "" {
-		results, err := GetNotificationsForUser(db, user)
-		if err != nil {
-			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
-			panic(err)
-		}
-		RespondWithJson(rw, results)
+		results, err = GetNotificationsForUser(db, user)
+	} else if token != "" {
+		results, err = GetNotificationsForToken(db, token)
 	} else {
-		http.Error(rw, "notifications request requires a user id", http.StatusBadRequest)
+		http.Error(rw, "notifications request requires a user id or device token", http.StatusBadRequest)
 		return
 	}
+	if err != nil {
+		http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+		panic(err)
+	}
+	RespondWithJson(rw, results)
 }
 
 func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
@@ -94,7 +99,6 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
-
 	merged := MergeNotifications(db, notificationarray)
 
 	err := SaveNotifications(db, merged)

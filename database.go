@@ -9,14 +9,28 @@ func Getdb(s *mgo.Session) *mgo.Database {
 	return s.DB(Getenv("DISPATCH_DATABASE_NAME", "dispatch"))
 }
 
-func GetAllAppFilters(db *mgo.Database) []AppFilter {
+func GetAllAppFilters(db *mgo.Database) ([]AppFilter, error) {
 	results := make([]AppFilter, 0)
 
 	// TEMPORARY: hack in our configuration
 	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{NotificationFilter{Keys: map[string]string{"provider_id":"tracs"}}}})
 	//db.C("appfilters").Find().All(&results)
 
-	return results
+	return results, nil
+}
+
+// TEMPORARY: hacked to have our configuration hard-coded
+func GetAppFilter(db *mgo.Database, appid string) (AppFilter, error) {
+	filters, err := GetAllAppFilters(db)
+	if err != nil {
+		return AppFilter{}, err
+	}
+	for _,filter := range filters {
+		if filter.AppID == appid {
+			return filter, nil
+		}
+	}
+	return AppFilter{}, mgo.ErrNotFound
 }
 
 func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
@@ -47,20 +61,49 @@ func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, err
 	return results, err
 }
 
+func GetNotificationsForToken(db *mgo.Database, token string) ([]Notification, error) {
+	results := []Notification{}
+	reg, err := GetRegistration(db, token)
+	if err != nil {
+		return results, err
+	}
+	notis, err := GetNotificationsForUser(db, reg.UserID)
+	if err != nil {
+		return results, err
+	}
+	appfilter, err := GetAppFilter(db, reg.AppID)
+	if err != nil {
+		return results, err
+	}
+	return FilterNotificationsForRegistration(notis, appfilter, reg), nil
+}
+
+func GetRegistration(db *mgo.Database, token string) (Registration, error) {
+	result := Registration{}
+	db.C("registrations").EnsureIndexKey("token")
+	err := db.C("registrations").Find(bson.M{"token":token}).One(result)
+	return result, err
+}
+
 func GetRegistrationsForUser(db *mgo.Database, user string) ([]Registration, error) {
 	results := make([]Registration, 0)
+	db.C("registrations").EnsureIndexKey("user_id")
 	err := db.C("registrations").Find(bson.M{"user_id": user}).All(&results)
 	return results, err
 }
 
-func GetRegistrationsForUsers(db *mgo.Database, userids []string) map[string][]Registration {
+func GetRegistrationsForUsers(db *mgo.Database, userids []string) (map[string][]Registration, error) {
 	ret := make(map[string][]Registration)
 	results := make([]Registration, 0)
-	db.C("registrations").Find(bson.M{"user_id":bson.M{"$in":userids}}).All(&results)
+	db.C("registrations").EnsureIndexKey("user_id")
+	err := db.C("registrations").Find(bson.M{"user_id":bson.M{"$in":userids}}).All(&results)
+	if err != nil {
+		return ret, err
+	}
 	for _,reg := range results {
 		ret[reg.UserID] = append(ret[reg.UserID], reg)
 	}
-	return ret
+	return ret, nil
 }
 
 func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
