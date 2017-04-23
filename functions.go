@@ -97,6 +97,27 @@ func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
 	return n, killnotification
 }
 
+func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
+	rethash := make(map[string]Notification)
+	hash := make(map[string]time.Time)
+	for _,n := range notificationarray {
+		hashkeybytes, err := json.Marshal(n.Keys)
+		if err == nil {
+			hashkey := string(hashkeybytes)
+			existingnotify, found := hash[hashkey]
+			if !found || existingnotify.Before(n.NotifyAfter.Time) {
+				hash[hashkey] = n.NotifyAfter.Time
+				rethash[hashkey] = n
+			}
+		}
+	}
+	ret := make([]Notification, len(rethash))
+	for _,v := range rethash {
+		ret = append(ret, v)
+	}
+	return ret
+}
+
 func MergeNotifications(db *mgo.Database, notificationarray []Notification) []Notification {
 	ret := []Notification{}
 	for _,n := range notificationarray {

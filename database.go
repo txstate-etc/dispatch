@@ -58,7 +58,7 @@ func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, err
 	c := db.C("notifications")
 	c.EnsureIndexKey("keys.user_id")
 	err := c.Find(bson.M{"keys.user_id": user}).Sort("-notify_after").All(&results)
-	return results, err
+	return NotificationsRemoveDupes(results), err
 }
 
 func GetNotificationsForToken(db *mgo.Database, token string) ([]Notification, error) {
@@ -75,7 +75,9 @@ func GetNotificationsForToken(db *mgo.Database, token string) ([]Notification, e
 	if err != nil {
 		return results, err
 	}
-	return FilterNotificationsForRegistration(notis, appfilter, reg), nil
+	ret := FilterNotificationsForRegistration(notis, appfilter, reg)
+	ret = NotificationsRemoveDupes(ret)
+	return ret, nil
 }
 
 func GetRegistration(db *mgo.Database, token string) (Registration, error) {
