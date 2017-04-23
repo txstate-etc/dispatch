@@ -81,7 +81,7 @@ func GetNotificationsForToken(db *mgo.Database, token string) ([]Notification, e
 func GetRegistration(db *mgo.Database, token string) (Registration, error) {
 	result := Registration{}
 	db.C("registrations").EnsureIndexKey("token")
-	err := db.C("registrations").Find(bson.M{"token":token}).One(result)
+	err := db.C("registrations").Find(bson.M{"token":token}).One(&result)
 	return result, err
 }
 
