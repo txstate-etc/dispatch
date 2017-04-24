@@ -55,6 +55,7 @@ func main() {
 	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
 	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
 	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
+	r.HandleFunc("/notifications/{id}", NotificationsPatch).Methods("PATCH")
 	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
@@ -106,6 +107,24 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
 		panic(err)
+	}
+}
+
+func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	id := mux.Vars(req)["id"]
+	patch := make(map[string]interface{})
+	JsonFromBody(req, &patch)
+	err := PatchNotification(db, id, patch)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "notification does not exist", http.StatusNotFound)
+		} else {
+			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
+		}
 	}
 }
 

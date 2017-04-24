@@ -108,6 +108,17 @@ func GetRegistrationsForUsers(db *mgo.Database, userids []string) (map[string][]
 	return ret, nil
 }
 
+func PatchNotification(db *mgo.Database, id string, newdata interface{}) error {
+	cinfo,err := db.C("notifications").Upsert(bson.M{"_id":id}, newdata)
+	if err != nil {
+		return err
+	}
+	if cinfo.Matched == 0 {
+		return mgo.ErrNotFound
+	}
+	return nil
+}
+
 func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 	filters := bson.M{}
 	for key,val := range nf.Keys {
