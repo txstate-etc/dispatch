@@ -8,6 +8,7 @@ web:
     - ./certs:/certs
   environment:
     DISPATCH_DATABASE_SERVER: db
+    DISPATCH_SECRET: ${DISPATCH_SECRET}
 db:
   image: mongo:3
   volumes:
