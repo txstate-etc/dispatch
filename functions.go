@@ -268,3 +268,10 @@ func SendAppleNotification(reg Registration, n Notification, badge int) error {
 func SendAndroidNotification(reg Registration, n Notification, badge int) error {
 	return nil
 }
+
+func ProviderAuthenticationValid(req *http.Request) bool {
+	// authenticate via secret key that client is authorized to send notifications
+	keyarray, present := req.Header["X-Dispatch-Key"]
+	secret := Getenv("DISPATCH_SECRET", "")
+	return len(secret) == 0 || (present && len(keyarray) > 0 && keyarray[0] == secret)
+}

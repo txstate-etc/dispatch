@@ -60,22 +60,8 @@ func main() {
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
-	for {
-		err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), AuthenticationMiddleware(r))
-		LOG.Crit("request panicked", "error", err)
-	}
-}
-
-func AuthenticationMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		keyarray, present := r.Header["X-Dispatch-Key"]
-		secret := Getenv("DISPATCH_SECRET", "")
-		if len(secret) == 0 || (present && len(keyarray) > 0 && keyarray[0] == secret) {
-			h.ServeHTTP(w, r)
-		} else {
-			http.Error(w, "authentication required", http.StatusUnauthorized)
-		}
-	})
+	err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
+	LOG.Crit("could not listen, exiting", "error", err)
 }
 
 func NotificationsList(rw http.ResponseWriter, req *http.Request) {
@@ -83,21 +69,23 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 	defer s.Close()
 	db := Getdb(s)
 
-	user := req.FormValue("user_id")
 	token := req.FormValue("token")
 	var results []Notification
 	var err error
-	if user != "" {
-		results, err = GetNotificationsForUser(db, user)
-	} else if token != "" {
+	if token != "" {
 		results, err = GetNotificationsForToken(db, token)
+		if err != nil {
+			if err == mgo.ErrNotFound {
+				http.Error(rw, "that token has not been registered", http.StatusUnauthorized)
+				return
+			} else {
+				http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+				panic(err)
+			}
+		}
 	} else {
-		http.Error(rw, "notifications request requires a user id or device token", http.StatusBadRequest)
+		http.Error(rw, "notifications request requires a device token", http.StatusBadRequest)
 		return
-	}
-	if err != nil {
-		http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
-		panic(err)
 	}
 	RespondWithJson(rw, results)
 }
@@ -107,6 +95,12 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	JsonFromBody(req, &notificationarray)
 	if len(notificationarray) == 0 {
 		http.Error(rw, "body must be non-empty array of notifications in JSON", http.StatusBadRequest)
+		return
+	}
+
+	// authenticate via secret key that client is authorized to send notifications
+	if !ProviderAuthenticationValid(req) {
+		http.Error(rw, "authentication required", http.StatusUnauthorized)
 		return
 	}
 
@@ -128,9 +122,46 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 	db := Getdb(s)
 
 	id := mux.Vars(req)["id"]
+	n, err := GetNotification(db, id)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "notification does not exist", http.StatusNotFound)
+			return
+		} else {
+			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+	}
+
+	token := req.FormValue("token")
+	if token == "" {
+		http.Error(rw, "token required to authenticate this request", http.StatusUnauthorized)
+		return
+	}
+	reg, err := GetRegistration(db, token)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "token is not registered", http.StatusUnauthorized)
+			return
+		} else {
+			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+	}
+
+	userid, present := n.Keys["user_id"]
+	if !present {
+		http.Error(rw, "notification not valid", http.StatusInternalServerError)
+		return
+	}
+	if userid != reg.UserID {
+		http.Error(rw, "you do not own that notification", http.StatusForbidden)
+		return
+	}
+
 	patch := make(map[string]interface{})
 	JsonFromBody(req, &patch)
-	err := PatchNotification(db, id, patch)
+	err = PatchNotification(db, id, patch)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "notification does not exist", http.StatusNotFound)
@@ -151,6 +182,11 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "keys.provider_id is required for all deletions", http.StatusBadRequest)
 		return
 	}
+	// authenticate via secret key that client is authorized to send notifications
+	if !ProviderAuthenticationValid(req) {
+		http.Error(rw, "authentication required", http.StatusUnauthorized)
+		return
+	}
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
@@ -168,17 +204,36 @@ func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
 	db := Getdb(s)
 
 	user := req.FormValue("user_id")
-	if user != "" {
-		results, err := GetRegistrationsForUser(db, user)
-		if err != nil {
-			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
-			panic(err)
-		}
-		RespondWithJson(rw, results)
-	} else {
+	if user == "" {
 		http.Error(rw, "registrations request requires a user id", http.StatusBadRequest)
 		return
 	}
+
+	token := req.FormValue("token")
+	if token == "" {
+		http.Error(rw, "token required to authenticate this request", http.StatusUnauthorized)
+		return
+	}
+
+	results, err := GetRegistrationsForUser(db, user)
+	if err != nil {
+		http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+		panic(err)
+	}
+
+	foundreg := false
+	for _,reg := range results {
+		if reg.UserID == user {
+			foundreg = true
+			break
+		}
+	}
+	if !foundreg {
+		http.Error(rw, "token and user_id do not match", http.StatusForbidden)
+		return
+	}
+
+	RespondWithJson(rw, results)
 }
 
 func RegistrationsGet(rw http.ResponseWriter, req *http.Request) {

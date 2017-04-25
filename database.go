@@ -33,6 +33,12 @@ func GetAppFilter(db *mgo.Database, appid string) (AppFilter, error) {
 	return AppFilter{}, mgo.ErrNotFound
 }
 
+func GetNotification(db *mgo.Database, nid string) (Notification, error) {
+	result := Notification{}
+	err := db.C("notifications").Find(bson.M{"_id": nid}).One(&result)
+	return result, err
+}
+
 func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
 	result := Notification{}
 	c := db.C("notifications")
@@ -109,14 +115,7 @@ func GetRegistrationsForUsers(db *mgo.Database, userids []string) (map[string][]
 }
 
 func PatchNotification(db *mgo.Database, id string, newdata interface{}) error {
-	cinfo,err := db.C("notifications").Upsert(bson.M{"_id":id}, newdata)
-	if err != nil {
-		return err
-	}
-	if cinfo.Matched == 0 {
-		return mgo.ErrNotFound
-	}
-	return nil
+	return db.C("notifications").UpdateId(id, newdata)
 }
 
 func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
