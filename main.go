@@ -61,9 +61,21 @@ func main() {
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
 	for {
-		err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
+		err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), AuthenticationMiddleware(r))
 		LOG.Crit("request panicked", "error", err)
 	}
+}
+
+func AuthenticationMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		keyarray, present := r.Header["X-Dispatch-Key"]
+		secret := Getenv("DISPATCH_SECRET", "")
+		if len(secret) == 0 || (present && len(keyarray) > 0 && keyarray[0] == secret) {
+			h.ServeHTTP(w, r)
+		} else {
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+		}
+	})
 }
 
 func NotificationsList(rw http.ResponseWriter, req *http.Request) {
