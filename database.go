@@ -135,7 +135,11 @@ func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 func SaveNotifications(db *mgo.Database, notificationarray []Notification) error {
 	b := db.C("notifications").Bulk()
 	for _,n := range notificationarray {
-		b.Upsert(bson.M{"_id": n.ID}, n)
+		if n.ID.Valid() {
+			b.Upsert(bson.M{"_id": n.ID}, n)
+		} else {
+			b.Insert(n)
+		}
 	}
 	_, err := b.Run()
 	return err
