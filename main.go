@@ -161,9 +161,19 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	patch := make(map[string]interface{})
-	JsonFromBody(req, &patch)
-	err = PatchNotification(db, id, patch)
+	patchbody := make(map[string]interface{})
+	JsonFromBody(req, &patchbody)
+	patchfiltered := make(map[string]interface{})
+	if seen, present := patchbody["seen"]; present {
+		patchfiltered["seen"] = seen
+	}
+	if read, present := patchbody["read"]; present {
+		patchfiltered["read"] = read
+	}
+	if cleared, present := patchbody["cleared"]; present {
+		patchfiltered["cleared"] = cleared
+	}
+	err = PatchNotification(db, id, patchfiltered)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "notification does not exist", http.StatusNotFound)
