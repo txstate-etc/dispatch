@@ -5,12 +5,14 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
 	"github.com/globalsign/mgo"
 	log "gopkg.in/inconshreveable/log15.v2"
 	"github.com/gorilla/mux"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/sideshow/apns2"
 )
 
@@ -268,7 +270,28 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "registration requires a device token, user id, platform and app id", http.StatusBadRequest)
 		return
 	}
-	LOG.Info("parsed registration body", "reg", reg)
+
+	jwtpublickey := Getenv("DISPATCH_JWT_KEY", "")
+	if jwtpublickey != "" {
+		jwtoken := req.FormValue("jwt")
+		if len(jwtoken) == 0 {
+			http.Error(rw, "A JSON Web Token is required as a URL parameter for registration", http.StatusUnauthorized)
+			return
+		}
+
+		token, _ := jwt.ParseWithClaims(jwtoken, &JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return jwtpublickey, nil
+		})
+
+		if !token.Valid {
+			http.Error(rw, "JSON Web Token was not valid", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
