@@ -12,7 +12,7 @@ type JwtClaims struct {
 
 var (
 	JwtInvalidUserError = errors.New("user_id not claimed")
-	JwtExpiredError = errors.New("user_id not claimed")
+	JwtExpiredError = errors.New("JWT expired")
 )
 
 func (c JwtClaims) Valid() error {
