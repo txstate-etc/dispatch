@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -281,8 +282,9 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	jwtpublickey := Getenv("DISPATCH_JWT_KEY", "")
-	if jwtpublickey != "" {
+	jwtpublickey, err := ioutil.ReadFile("/certs/auth/jwtservice.pub.key")
+	LOG.Info("try to read public key", "jwtpublickey", jwtpublickey)
+	if err == nil && len(jwtpublickey) > 0 {
 		jwtoken := req.FormValue("jwt")
 		if len(jwtoken) == 0 {
 			http.Error(rw, "A JSON Web Token is required as a URL parameter for registration", http.StatusUnauthorized)
