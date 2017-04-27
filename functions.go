@@ -153,8 +153,11 @@ func AppIsInterestedInNotification(appfilter AppFilter, n Notification) bool {
 }
 
 func RegistrationIsInterestedInNotification(reg Registration, n Notification) bool {
+	if reg.Settings.GlobalDisable {
+		return false
+	}
 	blacklisted := false
-	for _,filter := range reg.Blacklist {
+	for _,filter := range reg.Settings.Blacklist {
 		if NotificationFilterMatches(filter, n) {
 			blacklisted = true
 		}

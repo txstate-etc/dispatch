@@ -153,6 +153,11 @@ func SaveRegistration(db *mgo.Database, reg Registration) error {
 	return err
 }
 
+func SaveSettings(db *mgo.Database, token string, settings Settings) error {
+	err := db.C("registrations").Update(bson.M{"token":token}, bson.M{"settings":settings})
+	return err
+}
+
 func DeleteRegistrationWithNewSession(reg Registration) error {
 	s := SESSION.Copy()
 	defer s.Close()

@@ -63,6 +63,8 @@ func main() {
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
+	r.HandleFunc("/settings/{token}", SettingsGet).Methods("GET")
+	r.HandleFunc("/settings/{token}", SettingsSet).Methods("POST")
 	err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
 	LOG.Crit("could not listen, exiting", "error", err)
 }
@@ -325,5 +327,52 @@ func RegistrationsDelete(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		http.Error(rw, "registration deletion requires a device token", http.StatusBadRequest)
 		return
+	}
+}
+
+func SettingsGet(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	token := vars["token"]
+
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	reg, err := GetRegistration(db, token)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "registration does not exist", http.StatusNotFound)
+		} else {
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
+	}
+
+	RespondWithJson(rw, reg.Settings)
+}
+
+func SettingsSet(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	token := vars["token"]
+
+	settings := Settings{}
+	err := JsonFromBody(req, &settings)
+	if err != nil {
+		http.Error(rw, "could not parse JSON from post body", http.StatusBadRequest)
+	}
+
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	err := SaveSettings(db, token, settings)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "token does not exist; must register first, then update settings", http.StatusNotFound)
+			return
+		} else {
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			panic(err)
+		}
 	}
 }
