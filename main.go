@@ -359,13 +359,14 @@ func SettingsSet(rw http.ResponseWriter, req *http.Request) {
 	err := JsonFromBody(req, &settings)
 	if err != nil {
 		http.Error(rw, "could not parse JSON from post body", http.StatusBadRequest)
+		return
 	}
 
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
 
-	err := SaveSettings(db, token, settings)
+	err = SaveSettings(db, token, settings)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "token does not exist; must register first, then update settings", http.StatusNotFound)
