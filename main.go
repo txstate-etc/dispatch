@@ -293,12 +293,15 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		token, _ := jwt.ParseWithClaims(jwtoken, &JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.ParseWithClaims(jwtoken, &JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
 			return jwtpublickey, nil
 		})
+		if err != nil {
+			LOG.Crit("error with parsing JWT", "err", err)
+		}
 
 		if !token.Valid {
 			http.Error(rw, "JSON Web Token was not valid", http.StatusUnauthorized)
