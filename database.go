@@ -169,3 +169,9 @@ func DeleteRegistration(db *mgo.Database, reg Registration) error {
 	err := db.C("registrations").Remove(bson.M{"token":reg.Token})
 	return err
 }
+
+func GetAllMessagesForProvider(db *mgo.Database, provider string) ([]NotificationMessage, error) {
+	results := []NotificationMessage{}
+	err := db.C("messages").Find(bson.M{"filter.keys.provider_id":provider}).All(&results)
+	return results, err
+}

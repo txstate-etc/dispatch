@@ -284,8 +284,8 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	jwtpublickey, err := ioutil.ReadFile("/certs/auth/jwtservice.pub.key")
-	LOG.Info("try to read public key", "jwtpublickey", jwtpublickey)
+	jwtpublickey, err := ioutil.ReadFile("/certs/auth/jwtservice.key.pub")
+	LOG.Info("try to read public key", "jwtpublickey", fmt.Sprintf("%s", jwtpublickey))
 	if err == nil && len(jwtpublickey) > 0 {
 		jwtoken := req.FormValue("jwt")
 		if len(jwtoken) == 0 {

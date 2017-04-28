@@ -11,8 +11,6 @@ type Notification struct {
 	Cleared bool `json:"cleared"`
 	IsUpdate bool `json:"is_update" bson:"is_update"`
 	Errors bool `json:"errors"`
-	Message string `json:"message"`
-	UpdatedMessage string `json:"updated_message"`
 	ContentHash string `json:"content_hash"`
 	SendUpdates bool `json:"send_updates"`
 	NotifyAfter JsonTime `json:"notify_after" bson:"notify_after"`
@@ -23,4 +21,10 @@ type Notification struct {
 type NotificationFilter struct {
 	Keys map[string]string `json:"keys"`
 	OtherKeys map[string]string `json:"other_keys"`
+}
+
+type NotificationMessage struct {
+	Message string `json:"message"`
+	UpdateMessage string `json:"update_message" bson:"update_message"`
+	Filter NotificationFilter `json:"filter"`
 }

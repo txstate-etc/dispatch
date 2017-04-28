@@ -200,9 +200,21 @@ func FilterRegistrationsForNotification(registrations []Registration, appfilters
 	return ret
 }
 
+func FindMessageForNotification(messages []NotificationMessage, n Notification) NotificationMessage {
+	for _,message := range messages {
+		if NotificationFilterMatches(message.Filter, n) {
+			return message
+		}
+	}
+	return NotificationMessage{}
+}
+
 // function for sending a whole array of notifications, bundles up database calls to
 // avoid n+1 problems
 func SendNotificationArray(db *mgo.Database, notificationarray []Notification) error {
+	if len(notificationarray) == 0 {
+		return nil
+	}
 	userids := make([]string,len(notificationarray))
 	for _,n := range notificationarray {
 		userids = append(userids, n.Keys["user_id"])
@@ -215,12 +227,23 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 	if err != nil {
 		return err
 	}
+	var messages []NotificationMessage
+	provider, present := notificationarray[0].Keys["provider_id"]
+	if present {
+		messages, err = GetAllMessagesForProvider(db, provider)
+		if err != nil {
+			return err
+		}
+	} else {
+		messages = []NotificationMessage{}
+	}
 
 	for _,n := range notificationarray {
 		regsforuser := registrations[n.Keys["user_id"]]
 		wantstobenotified := FilterRegistrationsForNotification(regsforuser, appfilters, n)
 		if !n.Sent && n.NotifyAfter.Time.Before(time.Now()) {
-			SendNotification(wantstobenotified, n, 3)
+			message := FindMessageForNotification(messages, n)
+			SendNotification(wantstobenotified, n, message, 3)
 			MarkNotificationSent(db, n)
 		}
 	}
@@ -228,18 +251,18 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 }
 
 // send a single notification to all registered apps, no more database calls at this point
-func SendNotification(registrations []Registration, n Notification, badge int) {
+func SendNotification(registrations []Registration, n Notification, message NotificationMessage, badge int) {
 	for _,reg := range registrations {
 		var err error
-		if reg.Platform == Android { err = SendAndroidNotification(reg, n, badge) }
-		if reg.Platform == Apple { err = SendAppleNotification(reg, n, badge) }
+		if reg.Platform == Android { err = SendAndroidNotification(reg, n, message, badge) }
+		if reg.Platform == Apple { err = SendAppleNotification(reg, n, message, badge) }
 		if err != nil {
 			n.Errors = true
 		}
 	}
 }
 
-func SendAppleNotification(reg Registration, n Notification, badge int) error {
+func SendAppleNotification(reg Registration, n Notification, message NotificationMessage, badge int) error {
 	cert, err := certificate.FromPemFile("/certs/ios/"+reg.AppID+".pem", "")
 	if err != nil {
 		LOG.Crit("Certificate Error", "error", err, "registration", reg)
@@ -248,7 +271,9 @@ func SendAppleNotification(reg Registration, n Notification, badge int) error {
 	notification := &apns2.Notification{}
 	notification.DeviceToken = reg.Token
 	notification.Topic = reg.AppID
-	notification.Payload = payload.NewPayload().Alert(n.Message).Badge(badge)
+	msg := message.Message
+	if n.IsUpdate { msg = message.UpdateMessage }
+	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge)
 
 	client := APNSMANAGER.Get(cert)
 	if Getenv("DISPATCH_ENVIRONMENT", "development") == "production" {
@@ -268,7 +293,7 @@ func SendAppleNotification(reg Registration, n Notification, badge int) error {
 	return nil
 }
 
-func SendAndroidNotification(reg Registration, n Notification, badge int) error {
+func SendAndroidNotification(reg Registration, n Notification, message NotificationMessage, badge int) error {
 	return nil
 }
 
