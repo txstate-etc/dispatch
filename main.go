@@ -285,8 +285,12 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	jwtpublickey, err := ioutil.ReadFile("/certs/auth/jwtservice.key.pub")
-	LOG.Info("try to read public key", "jwtpublickey", fmt.Sprintf("%s", jwtpublickey))
 	if err == nil && len(jwtpublickey) > 0 {
+		jwtrsakey, err := jwt.ParseRSAPublicKeyFromPEM(jwtpublickey)
+		if err != nil {
+			http.Error(rw, "problem authenticating your JWT", http.StatusInternalServerError)
+		}
+
 		jwtoken := req.FormValue("jwt")
 		if len(jwtoken) == 0 {
 			http.Error(rw, "A JSON Web Token is required as a URL parameter for registration", http.StatusUnauthorized)
@@ -297,10 +301,10 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-			return jwtpublickey, nil
+			return jwtrsakey, nil
 		})
 		if err != nil {
-			LOG.Crit("error with parsing JWT", "err", err)
+			LOG.Crit("error parsing JWT", "err", err)
 		}
 
 		if !token.Valid {
