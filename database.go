@@ -115,7 +115,7 @@ func GetRegistrationsForUsers(db *mgo.Database, userids []string) (map[string][]
 }
 
 func PatchNotification(db *mgo.Database, id string, newdata interface{}) error {
-	return db.C("notifications").UpdateId(id, newdata)
+	return db.C("notifications").UpdateId(id, bson.M{"$set":newdata})
 }
 
 func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
@@ -145,7 +145,7 @@ func SaveNotifications(db *mgo.Database, notificationarray []Notification) error
 }
 
 func MarkNotificationSent(db *mgo.Database, n Notification) {
-	db.C("notifications").Update(bson.M{"_id":n.ID}, bson.M{"sent":true, "errors":n.Errors})
+	db.C("notifications").Update(bson.M{"_id":n.ID}, bson.M{"$set":bson.M{"sent":true, "errors":n.Errors}})
 }
 
 func SaveRegistration(db *mgo.Database, reg Registration) error {
@@ -154,7 +154,7 @@ func SaveRegistration(db *mgo.Database, reg Registration) error {
 }
 
 func SaveSettings(db *mgo.Database, token string, settings Settings) error {
-	err := db.C("registrations").Update(bson.M{"token":token}, bson.M{"settings":settings})
+	err := db.C("registrations").Update(bson.M{"token":token}, bson.M{"$set":bson.M{"settings":settings}})
 	return err
 }
 
