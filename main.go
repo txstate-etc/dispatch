@@ -82,8 +82,8 @@ func main() {
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
 	r.HandleFunc("/settings/{token}", SettingsGet).Methods("GET")
 	r.HandleFunc("/settings/{token}", SettingsSet).Methods("POST")
-	if _, err := os.Stat("/certs/ssl/dispatch.cert.pem"); err == nil {
-		err := http.ListenAndServeTLS(":443", "/certs/ssl/dispatch.cert.pem", "/certs/ssl/dispatch.key.pem", r)
+	if _, err := os.Stat("/ssl/dispatch.cert.pem"); err == nil {
+		err := http.ListenAndServeTLS(":443", "/ssl/dispatch.cert.pem", "/ssl/dispatch.key.pem", r)
 		LOG.Crit("could not listen, exiting", "error", err)
 	} else {
 		err := http.ListenAndServe(":80", r)
