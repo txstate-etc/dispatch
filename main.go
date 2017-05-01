@@ -82,8 +82,13 @@ func main() {
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
 	r.HandleFunc("/settings/{token}", SettingsGet).Methods("GET")
 	r.HandleFunc("/settings/{token}", SettingsSet).Methods("POST")
-	err := http.ListenAndServe(Getenv("DISPATCH_PORT", ":8000"), r)
-	LOG.Crit("could not listen, exiting", "error", err)
+	if _, err := os.Stat("/certs/ssl/dispatch.cert.pem"); err == nil {
+		err := http.ListenAndServeTLS(":443", "/certs/ssl/dispatch.cert.pem", "/certs/ssl/dispatch.key.pem", r)
+		LOG.Crit("could not listen, exiting", "error", err)
+	} else {
+		err := http.ListenAndServe(":80", r)
+		LOG.Crit("could not listen, exiting", "error", err)
+	}
 }
 
 func NotificationsList(rw http.ResponseWriter, req *http.Request) {

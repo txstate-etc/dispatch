@@ -1,7 +1,8 @@
 web:
   build: .
   ports:
-    - "8000:8000"
+    - "8000:80"
+    - "8443:443"
   links:
     - db
   volumes:
