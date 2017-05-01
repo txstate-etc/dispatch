@@ -170,6 +170,14 @@ func DeleteRegistration(db *mgo.Database, reg Registration) error {
 	return err
 }
 
+func ReloadMessages(db *mgo.Database, messages []interface{}) error {
+	c := db.C("messages")
+	if err := c.DropCollection(); err != nil && err.Error() != "ns not found" {
+		return err
+	}
+	return c.Insert(messages...)
+}
+
 func GetAllMessagesForProvider(db *mgo.Database, provider string) ([]NotificationMessage, error) {
 	results := []NotificationMessage{}
 	err := db.C("messages").Find(bson.M{"filter.keys.provider_id":provider}).All(&results)

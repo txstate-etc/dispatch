@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -43,9 +44,25 @@ func init() {
 
 	server := Getenv("DISPATCH_DATABASE_SERVER", "localhost")
 
-	SESSION, err = mgo.Dial(server)
-	if err != nil {
+	if SESSION, err = mgo.Dial(server); err != nil {
 		LOG.Crit("init", "error", err.Error())
+		panic("Dispatch service is terminating")
+	}
+
+	// load messages from local file
+	messagejson, err := ioutil.ReadFile("/go/src/dispatch/messages.json")
+	if err != nil {
+		LOG.Crit("init", "err", err.Error())
+		panic("Dispatch service is terminating")
+	}
+	messages := []interface{}{}
+	if err := json.Unmarshal(messagejson, &messages); err != nil {
+		LOG.Crit("messages json not parseable", "err", err.Error())
+		panic("Dispatch service is terminating")
+	}
+	db := Getdb(SESSION)
+	if err := ReloadMessages(db, messages); err != nil {
+		LOG.Crit("could not insert messages into database", "err", err.Error())
 		panic("Dispatch service is terminating")
 	}
 

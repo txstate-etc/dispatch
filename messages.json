@@ -1,0 +1,21 @@
+[{
+	"filter":{
+		"keys":{
+			"provider_id":"tracs",
+			"object_type":"announcement"
+		},
+		"other_keys":{}
+	},
+	"message": "You have a new announcement.",
+	"update_message": "An announcement has been updated."
+},{
+	"filter":{
+		"keys":{
+			"provider_id":"tracs",
+			"object_type":"discussion"
+		},
+		"other_keys":{}
+	},
+	"message": "A new forum message has been posted.",
+	"update_message": "A forum message has been edited."
+}]
