@@ -42,9 +42,15 @@ func init() {
 			log.StreamHandler(os.Stdout, log.JsonFormat())))
 	var err error
 
-	server := Getenv("DISPATCH_DATABASE_SERVER", "localhost")
+	mgoInfo := &mgo.DialInfo{
+		Addrs: []string{Getenv("DISPATCH_DATABASE_SERVER", "localhost")},
+		Timeout: 60*time.Second,
+		Database: Getenv("DISPATCH_DATABASE_NAME", "dispatch"),
+		Username: Getenv("DISPATCH_DATABASE_USER", ""),
+		Password: Getenv("DISPATCH_DATABASE_PASSWORD", ""),
+	}
 
-	if SESSION, err = mgo.Dial(server); err != nil {
+	if SESSION, err = mgo.DialWithInfo(mgoInfo); err != nil {
 		LOG.Crit("init", "error", err.Error())
 		panic("Dispatch service is terminating")
 	}
