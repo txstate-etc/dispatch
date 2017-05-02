@@ -1,5 +1,7 @@
 package main
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -39,6 +41,12 @@ func Getenv(key string, def string) string {
 		return def
 	}
 	return ret
+}
+
+func GenerateHash(content string) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(content))
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
 func MapKeys(mymap interface{}) []string {
@@ -274,6 +282,7 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 	msg := message.Message
 	if n.IsUpdate { msg = message.UpdateMessage }
 	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge)
+	notification.CollapseID = GenerateHash(msg)
 
 	client := APNSMANAGER.Get(cert)
 	if Getenv("DISPATCH_ENVIRONMENT", "development") == "production" {
