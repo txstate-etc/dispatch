@@ -1,13 +1,11 @@
-// dispatch push notifications at requested times
-// docs:
-//   https://godoc.org/gopkg.in/inconshreveable/log15.v2
-//   http://www.gorillatoolkit.org/pkg/
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -48,6 +46,11 @@ func init() {
 		Database: Getenv("DISPATCH_DATABASE_NAME", "dispatch"),
 		Username: Getenv("DISPATCH_DATABASE_USER", ""),
 		Password: Getenv("DISPATCH_DATABASE_PASSWORD", ""),
+	}
+	if Getenv("DISPATCH_DATABASE_SSL", "") == "true" {
+		mgoInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+			return tls.Dial("tcp", addr.String(), &tls.Config{})
+		}
 	}
 
 	if SESSION, err = mgo.DialWithInfo(mgoInfo); err != nil {
