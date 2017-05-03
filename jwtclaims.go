@@ -19,7 +19,7 @@ func (c JwtClaims) Valid() error {
 	if c.UserID == "" {
 		return JwtInvalidUserError
 	}
-	if c.Expires.Time.Before(time.Now()) {
+	if c.Expires.Time().Before(time.Now()) {
 		return JwtExpiredError
 	}
 	return nil

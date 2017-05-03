@@ -2,10 +2,13 @@ package main
 import (
 	"time"
 	"fmt"
+	"github.com/globalsign/mgo/bson"
 )
 
-type JsonTime struct {
-	time.Time
+type JsonTime time.Time
+
+func (self JsonTime) MarshalJSON() ([]byte, error) {
+	return []byte(self.String()), nil
 }
 
 func (self *JsonTime) UnmarshalJSON(b []byte) (err error) {
@@ -22,11 +25,31 @@ func (self *JsonTime) UnmarshalJSON(b []byte) (err error) {
 		t, err = time.Parse(format, s)
 		if err == nil { break }
 	}
-	self.Time = t
+	*self = JsonTime(t)
 	return err
 }
 
-func (self *JsonTime) MarshalJSON() ([]byte, error) {
-	s := fmt.Sprintf("\"%s\"", self.Time.Format(time.RFC3339))
-	return []byte(s), nil
+func (self JsonTime) GetBSON() (interface{}, error) {
+	t := time.Time(self)
+	if t.IsZero() {
+		return nil, nil
+	}
+	return t, nil
+}
+
+func (self *JsonTime) SetBSON(raw bson.Raw) error {
+	var t time.Time
+	if err := raw.Unmarshal(&t); err != nil {
+		return err
+	}
+	*self = JsonTime(t)
+	return nil
+}
+
+func (self JsonTime) String() string {
+	return fmt.Sprintf("\"%s\"", time.Time(self).Format(time.RFC3339))
+}
+
+func (self JsonTime) Time() time.Time {
+	return time.Time(self)
 }

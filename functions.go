@@ -113,8 +113,8 @@ func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 		if err == nil {
 			hashkey := string(hashkeybytes)
 			existingnotify, found := hash[hashkey]
-			if !found || existingnotify.Before(n.NotifyAfter.Time) {
-				hash[hashkey] = n.NotifyAfter.Time
+			if !found || existingnotify.Before(n.NotifyAfter.Time()) {
+				hash[hashkey] = n.NotifyAfter.Time()
 				rethash[hashkey] = n
 			}
 		}
@@ -249,7 +249,7 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 	for _,n := range notificationarray {
 		regsforuser := registrations[n.Keys["user_id"]]
 		wantstobenotified := FilterRegistrationsForNotification(regsforuser, appfilters, n)
-		if !n.Sent && n.NotifyAfter.Time.Before(time.Now()) {
+		if !n.Sent && n.NotifyAfter.Time().Before(time.Now()) {
 			message := FindMessageForNotification(messages, n)
 			SendNotification(wantstobenotified, n, message, 3)
 			MarkNotificationSent(db, n)
