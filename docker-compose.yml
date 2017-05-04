@@ -12,6 +12,7 @@ services:
     environment:
       DISPATCH_DATABASE_SERVER: db
       DISPATCH_SECRET: ${DISPATCH_SECRET}
+      DISPATCH_FCM_SECRET: ${DISPATCH_FCM_SECRET}
   db:
     image: mongo:3
     ports:

@@ -1,4 +1,5 @@
 package main
+
 import (
 	"crypto/sha1"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"time"
+
 	"github.com/globalsign/mgo"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
@@ -54,7 +56,7 @@ func MapKeys(mymap interface{}) []string {
 	if v.Kind() == reflect.Map {
 		rkeys := v.MapKeys()
 		ret := make([]string, len(rkeys))
-		for _,kv := range rkeys {
+		for _, kv := range rkeys {
 			ret = append(ret, kv.String())
 		}
 		return ret
@@ -108,7 +110,7 @@ func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
 func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 	rethash := make(map[string]Notification)
 	hash := make(map[string]time.Time)
-	for _,n := range notificationarray {
+	for _, n := range notificationarray {
 		hashkeybytes, err := json.Marshal(n.Keys)
 		if err == nil {
 			hashkey := string(hashkeybytes)
@@ -120,7 +122,7 @@ func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 		}
 	}
 	ret := make([]Notification, 0, len(rethash))
-	for _,v := range rethash {
+	for _, v := range rethash {
 		ret = append(ret, v)
 	}
 	return ret
@@ -128,8 +130,8 @@ func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 
 func MergeNotifications(db *mgo.Database, notificationarray []Notification) []Notification {
 	ret := []Notification{}
-	for _,n := range notificationarray {
-		m,kill := MergeNotification(db, n)
+	for _, n := range notificationarray {
+		m, kill := MergeNotification(db, n)
 		if !kill {
 			ret = append(ret, m)
 		}
@@ -138,12 +140,12 @@ func MergeNotifications(db *mgo.Database, notificationarray []Notification) []No
 }
 
 func NotificationFilterMatches(filter NotificationFilter, n Notification) bool {
-	for key,val := range filter.Keys {
+	for key, val := range filter.Keys {
 		if val != n.Keys[key] {
 			return false
 		}
 	}
-	for key,val := range filter.OtherKeys {
+	for key, val := range filter.OtherKeys {
 		if val != n.OtherKeys[key] {
 			return false
 		}
@@ -152,7 +154,7 @@ func NotificationFilterMatches(filter NotificationFilter, n Notification) bool {
 }
 
 func AppIsInterestedInNotification(appfilter AppFilter, n Notification) bool {
-	for _,filter := range appfilter.Whitelist {
+	for _, filter := range appfilter.Whitelist {
 		if NotificationFilterMatches(filter, n) {
 			return true
 		}
@@ -165,7 +167,7 @@ func RegistrationIsInterestedInNotification(reg Registration, n Notification) bo
 		return false
 	}
 	blacklisted := false
-	for _,filter := range reg.Settings.Blacklist {
+	for _, filter := range reg.Settings.Blacklist {
 		if NotificationFilterMatches(filter, n) {
 			blacklisted = true
 		}
@@ -175,7 +177,7 @@ func RegistrationIsInterestedInNotification(reg Registration, n Notification) bo
 
 func GetAppsInterestedInNotification(appfilters []AppFilter, n Notification) map[string]bool {
 	ret := make(map[string]bool)
-	for _,appfilter := range appfilters {
+	for _, appfilter := range appfilters {
 		if AppIsInterestedInNotification(appfilter, n) {
 			ret[appfilter.AppID] = true
 		}
@@ -185,7 +187,7 @@ func GetAppsInterestedInNotification(appfilters []AppFilter, n Notification) map
 
 func FilterNotificationsForRegistration(notifications []Notification, appfilter AppFilter, reg Registration) []Notification {
 	ret := []Notification{}
-	for _,n := range notifications {
+	for _, n := range notifications {
 		if AppIsInterestedInNotification(appfilter, n) {
 			if RegistrationIsInterestedInNotification(reg, n) {
 				ret = append(ret, n)
@@ -198,7 +200,7 @@ func FilterNotificationsForRegistration(notifications []Notification, appfilter 
 func FilterRegistrationsForNotification(registrations []Registration, appfilters []AppFilter, n Notification) []Registration {
 	apphash := GetAppsInterestedInNotification(appfilters, n)
 	ret := make([]Registration, 0)
-	for _,reg := range registrations {
+	for _, reg := range registrations {
 		if apphash[reg.AppID] { // application is interested
 			if RegistrationIsInterestedInNotification(reg, n) {
 				ret = append(ret, reg)
@@ -209,7 +211,7 @@ func FilterRegistrationsForNotification(registrations []Registration, appfilters
 }
 
 func FindMessageForNotification(messages []NotificationMessage, n Notification) NotificationMessage {
-	for _,message := range messages {
+	for _, message := range messages {
 		if NotificationFilterMatches(message.Filter, n) {
 			return message
 		}
@@ -223,8 +225,8 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 	if len(notificationarray) == 0 {
 		return nil
 	}
-	userids := make([]string,len(notificationarray))
-	for _,n := range notificationarray {
+	userids := make([]string, len(notificationarray))
+	for _, n := range notificationarray {
 		userids = append(userids, n.Keys["user_id"])
 	}
 	registrations, err := GetRegistrationsForUsers(db, userids)
@@ -246,7 +248,7 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 		messages = []NotificationMessage{}
 	}
 
-	for _,n := range notificationarray {
+	for _, n := range notificationarray {
 		regsforuser := registrations[n.Keys["user_id"]]
 		wantstobenotified := FilterRegistrationsForNotification(regsforuser, appfilters, n)
 		if !n.Sent && n.NotifyAfter.Time().Before(time.Now()) {
@@ -260,10 +262,14 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 
 // send a single notification to all registered apps, no more database calls at this point
 func SendNotification(registrations []Registration, n Notification, message NotificationMessage, badge int) {
-	for _,reg := range registrations {
+	for _, reg := range registrations {
 		var err error
-		if reg.Platform == Android { err = SendAndroidNotification(reg, n, message, badge) }
-		if reg.Platform == Apple { err = SendAppleNotification(reg, n, message, badge) }
+		if reg.Platform == Android {
+			err = SendAndroidNotification(reg, n, message, badge)
+		}
+		if reg.Platform == Apple {
+			err = SendAppleNotification(reg, n, message, badge)
+		}
 		if err != nil {
 			n.Errors = true
 		}
@@ -280,7 +286,9 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 	notification.DeviceToken = reg.Token
 	notification.Topic = reg.AppID
 	msg := message.Message
-	if n.IsUpdate { msg = message.UpdateMessage }
+	if n.IsUpdate {
+		msg = message.UpdateMessage
+	}
 	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge)
 	notification.CollapseID = GenerateHash(msg)
 
@@ -303,6 +311,40 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 }
 
 func SendAndroidNotification(reg Registration, n Notification, message NotificationMessage, badge int) error {
+	apiKey := os.Getenv("DISPATCH_FCM_SECRET")
+	client := fcm.NewFcmClient(apiKey)
+
+	var msg string
+	if n.IsUpdate {
+		msg = message.UpdateMessage
+	} else {
+		msg = message.Message
+	}
+
+	notification := &fcm.NotificationPayload{
+		Body: msg,
+	}
+
+	data := map[string]string{
+		"shouldLoadNotificationsView": "false",
+	}
+
+	client.NewFcmMsgTo(reg.Token, data)
+	client.SetNotificationPayload(notification)
+	status, err := client.Send()
+	if err != nil {
+		LOG.Crit("Failed to push notification to Google", err, "registration", reg, "notification", n)
+		return err
+	}
+
+	if status.Fail > 0 {
+		DeleteRegistrationWithNewSession(reg)
+	}
+
+	if status.Success > 0 {
+		LOG.Info("successfully pushed to Google", "n", n, "statusCode", status.StatusCode, "messageID", status.MsgId)
+	}
+	status.PrintResults()
 	return nil
 }
 
