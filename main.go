@@ -136,6 +136,7 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 
 	// authenticate via secret key that client is authorized to send notifications
 	if !ProviderAuthenticationValid(req) {
+		LOG.Error("Provider did not send a valid X-Dispatch-Key header");
 		http.Error(rw, "authentication required", http.StatusUnauthorized)
 		return
 	}
@@ -147,6 +148,7 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 
 	err := SaveNotifications(db, merged)
 	if err != nil {
+		LOG.Error("error writing notifications to database", "err", err);
 		http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
 		panic(err)
 	}
@@ -164,6 +166,7 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "notification does not exist", http.StatusNotFound)
 			return
 		} else {
+			LOG.Error("error connecting to database", "err", err);
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
 			panic(err)
 		}
@@ -180,6 +183,7 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "token is not registered", http.StatusUnauthorized)
 			return
 		} else {
+			LOG.Error("error connecting to database", "err", err);
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
 			panic(err)
 		}
@@ -239,6 +243,7 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 
 	err := DeleteNotifications(db, nf)
 	if err != nil {
+		LOG.Error("NotificationsDelete: database error while deleting notifications", "err", err);
 		http.Error(rw, "database error while deleting notifications", http.StatusInternalServerError)
 		panic(err)
 	}
@@ -263,6 +268,7 @@ func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
 
 	results, err := GetRegistrationsForUser(db, user)
 	if err != nil {
+		LOG.Error("RegistrationsList: problem connecting to database", "err", err);
 		http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
 		panic(err)
 	}
@@ -295,6 +301,7 @@ func RegistrationsGet(rw http.ResponseWriter, req *http.Request) {
 		if err == mgo.ErrNotFound {
 			rw.WriteHeader(http.StatusNotFound)
 		} else {
+			LOG.Error("RegistrationsGet: problem connecting to database", "err", err);
 			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
 			panic(err)
 		}
@@ -335,7 +342,7 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 			return jwtrsakey, nil
 		})
 		if err != nil {
-			LOG.Crit("error parsing JWT", "err", err)
+			LOG.Error("error parsing JWT", "err", err)
 		}
 
 		if !token.Valid {
@@ -350,6 +357,7 @@ func RegistrationsCreate(rw http.ResponseWriter, req *http.Request) {
 
 	err = SaveRegistration(db, reg)
 	if err != nil {
+		LOG.Error("RegistrationsCreate: database error while upserting registration", "err", err);
 		http.Error(rw, "database error while upserting registration", http.StatusInternalServerError)
 		panic(err)
 	}
@@ -381,6 +389,7 @@ func SettingsGet(rw http.ResponseWriter, req *http.Request) {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "registration does not exist", http.StatusNotFound)
 		} else {
+			LOG.Error("SettingsGet: problem connecting to database", "err", err);
 			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
 			panic(err)
 		}
@@ -410,6 +419,7 @@ func SettingsSet(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "token does not exist; must register first, then update settings", http.StatusNotFound)
 			return
 		} else {
+			LOG.Error("SettingsSet: problem connecting to database", "err", err);
 			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
 			panic(err)
 		}
