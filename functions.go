@@ -14,7 +14,7 @@ import (
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
 	"github.com/sideshow/apns2/payload"
-	fcm "github.com/txstate-etc/go-gcm"
+	fcm "github.com/txstate-etc/go-fcm"
 )
 
 func LoopForNotificationsToSend(seconds time.Duration) {
