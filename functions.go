@@ -14,7 +14,7 @@ import (
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
 	"github.com/sideshow/apns2/payload"
-	//gcm "https://github.com/kikinteractive/go-gcm"
+	fcm "github.com/txstate-etc/go-gcm"
 )
 
 func LoopForNotificationsToSend(seconds time.Duration) {
