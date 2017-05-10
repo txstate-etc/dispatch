@@ -19,18 +19,36 @@ func GetAllAppFilters(db *mgo.Database) ([]AppFilter, error) {
 	return results, nil
 }
 
-// TEMPORARY: hacked to have our configuration hard-coded
 func GetAppFilter(db *mgo.Database, appid string) (AppFilter, error) {
-	filters, err := GetAllAppFilters(db)
+	result, err := GetAppFilters(db, []string{appid})
 	if err != nil {
 		return AppFilter{}, err
 	}
+
+	ret, ok := result[appid]
+	if !ok {
+		return ret, mgo.ErrNotFound
+	}
+	return ret, nil
+}
+
+// TEMPORARY: hacked to have our configuration hard-coded
+func GetAppFilters(db *mgo.Database, appids []string) (map[string]AppFilter, error) {
+	ret := map[string]AppFilter{}
+	filters, err := GetAllAppFilters(db)
+	if err != nil {
+		return ret, err
+	}
+	hash := map[string]bool{}
+	for _,app := range appids {
+		hash[app] = true
+	}
 	for _,filter := range filters {
-		if filter.AppID == appid {
-			return filter, nil
+		if hash[filter.AppID] {
+			ret[filter.AppID] = filter
 		}
 	}
-	return AppFilter{}, mgo.ErrNotFound
+	return ret, nil
 }
 
 func GetNotification(db *mgo.Database, nid string) (Notification, error) {
@@ -62,8 +80,12 @@ func GetNotificationsUnsent(db *mgo.Database) ([]Notification, error) {
 func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, error) {
 	results := make([]Notification, 0)
 	c := db.C("notifications")
-	c.EnsureIndexKey("keys.user_id")
-	err := c.Find(bson.M{"keys.user_id": user}).Sort("-notify_after").All(&results)
+	idx := mgo.Index{
+		Key: []string{"keys.user_id"},
+		PartialFilter: bson.M{"sent":true},
+	}
+	c.EnsureIndex(idx)
+	err := c.Find(bson.M{"keys.user_id": user, "sent":true}).Sort("-notify_after").All(&results)
 	return NotificationsRemoveDupes(results), err
 }
 
@@ -84,6 +106,53 @@ func GetNotificationsForToken(db *mgo.Database, token string) ([]Notification, e
 	ret := FilterNotificationsForRegistration(notis, appfilter, reg)
 	ret = NotificationsRemoveDupes(ret)
 	return ret, nil
+}
+
+func GetUnseenNotificationsForUsers(db *mgo.Database, users []string) (map[string][]Notification, error) {
+	results := []Notification{}
+	c := db.C("notifications")
+	idx := mgo.Index{
+		Key: []string{"keys.user_id"},
+		PartialFilter: bson.M{"sent":true, "seen":false},
+	}
+	c.EnsureIndex(idx)
+	err := c.Find(bson.M{"keys.user_id": bson.M{"$in":users}, "sent":true, "seen":false}).All(&results)
+	ret := map[string][]Notification{}
+	for _,n := range results {
+		ret[n.Keys["user_id"]] = append(ret[n.Keys["user_id"]], n)
+	}
+	return ret, err
+}
+
+func GetBadgeCountsForRegistrations(db *mgo.Database, regs []Registration) (map[string]int, error) {
+	ret := map[string]int{}
+	userids := []string{}
+	appids := []string{}
+	for _,r := range regs {
+		userids = append(userids, r.UserID)
+		appids = append(appids, r.AppID)
+	}
+	notis, err := GetUnseenNotificationsForUsers(db, userids)
+	if err != nil {
+		return ret, err
+	}
+	appfilters, err := GetAppFilters(db, appids)
+	if err != nil {
+		return ret, err
+	}
+
+	for _,r := range regs {
+		filtered := FilterNotificationsForRegistration(notis[r.UserID], appfilters[r.AppID], r)
+		filtered = NotificationsRemoveDupes(filtered)
+		ret[r.Token] = len(filtered)
+	}
+	return ret, nil
+}
+
+func GetBadgeCountForRegistration(db *mgo.Database, reg Registration) (int, error) {
+	result, err := GetBadgeCountsForRegistrations(db, []Registration{reg})
+	ret := result[reg.Token]
+	return ret, err
 }
 
 func GetRegistration(db *mgo.Database, token string) (Registration, error) {

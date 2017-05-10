@@ -233,7 +233,17 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 	if err != nil {
 		return err
 	}
+	flatregs := []Registration{}
+	for _,regs := range registrations {
+		for _,r := range regs {
+			flatregs = append(flatregs, r)
+		}
+	}
 	appfilters, err := GetAllAppFilters(db)
+	if err != nil {
+		return err
+	}
+	badgecounts, err := GetBadgeCountsForRegistrations(db, flatregs)
 	if err != nil {
 		return err
 	}
@@ -253,7 +263,7 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 		wantstobenotified := FilterRegistrationsForNotification(regsforuser, appfilters, n)
 		if !n.Sent && n.NotifyAfter.Time().Before(time.Now()) {
 			message := FindMessageForNotification(messages, n)
-			SendNotification(wantstobenotified, n, message, 3)
+			SendNotification(wantstobenotified, n, message, badgecounts)
 			MarkNotificationSent(db, n)
 		}
 	}
@@ -261,14 +271,14 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 }
 
 // send a single notification to all registered apps, no more database calls at this point
-func SendNotification(registrations []Registration, n Notification, message NotificationMessage, badge int) {
+func SendNotification(registrations []Registration, n Notification, message NotificationMessage, badgecounts map[string]int) {
 	for _, reg := range registrations {
 		var err error
 		if reg.Platform == Android {
-			err = SendAndroidNotification(reg, n, message, badge)
+			err = SendAndroidNotification(reg, n, message, badgecounts[reg.Token])
 		}
 		if reg.Platform == Apple {
-			err = SendAppleNotification(reg, n, message, badge)
+			err = SendAppleNotification(reg, n, message, badgecounts[reg.Token])
 		}
 		if err != nil {
 			n.Errors = true
