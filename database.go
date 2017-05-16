@@ -82,10 +82,10 @@ func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, err
 	c := db.C("notifications")
 	idx := mgo.Index{
 		Key: []string{"keys.user_id"},
-		PartialFilter: bson.M{"sent":true},
+		PartialFilter: bson.M{"sent":true, "cleared":false},
 	}
 	c.EnsureIndex(idx)
-	err := c.Find(bson.M{"keys.user_id": user, "sent":true}).Sort("-notify_after").All(&results)
+	err := c.Find(bson.M{"keys.user_id": user, "sent":true, "cleared":false}).Sort("-notify_after").All(&results)
 	return NotificationsRemoveDupes(results), err
 }
 
