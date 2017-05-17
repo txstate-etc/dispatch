@@ -246,8 +246,8 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 		return err
 	}
 	flatregs := []Registration{}
-	for _,regs := range registrations {
-		for _,r := range regs {
+	for _, regs := range registrations {
+		for _, r := range regs {
 			flatregs = append(flatregs, r)
 		}
 	}
@@ -348,7 +348,7 @@ func SendAndroidNotification(reg Registration, n Notification, message Notificat
 	}
 
 	data := map[string]string{
-		"shouldLoadNotificationsView": "false",
+		"shouldLoadNotificationsView": "true",
 	}
 
 	client.NewFcmMsgTo(reg.Token, data)
