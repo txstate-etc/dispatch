@@ -81,7 +81,7 @@ func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, err
 	results := make([]Notification, 0)
 	c := db.C("notifications")
 	idx := mgo.Index{
-		Key: []string{"keys.user_id"},
+		Key: []string{"keys.user_id", "notify_after"},
 		PartialFilter: bson.M{"sent":true, "cleared":false},
 	}
 	c.EnsureIndex(idx)
