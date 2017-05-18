@@ -249,6 +249,7 @@ func NotificationsPatchAll(rw http.ResponseWriter, req *http.Request) {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "no registration found with that token", http.StatusUnauthorized)
 		} else {
+			LOG.Error("error connecting to database", "err", err);
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
 		}
 	}
