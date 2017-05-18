@@ -28,3 +28,14 @@ type NotificationMessage struct {
 	UpdateMessage string `json:"update_message" bson:"update_message"`
 	Filter NotificationFilter `json:"filter"`
 }
+
+type NotificationPatch struct {
+	Seen bool `json:"seen"`
+	Read bool `json:"read"`
+	Cleared bool `json:"cleared"`
+}
+
+type BulkNotificationPatch struct {
+	IDs []bson.ObjectId `json:"ids"`
+	Patch NotificationPatch `json:"patches"`
+}

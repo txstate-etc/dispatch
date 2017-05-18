@@ -84,6 +84,7 @@ func main() {
 	r.HandleFunc("/notifications", NotificationsList).Methods("GET")
 	r.HandleFunc("/notifications", NotificationsCreate).Methods("POST")
 	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
+	r.HandleFunc("/notifications", NotificationsPatchAll).Methods("PATCH")
 	r.HandleFunc("/notifications/{id}", NotificationsPatch).Methods("PATCH")
 	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
@@ -115,8 +116,9 @@ func NotificationsList(rw http.ResponseWriter, req *http.Request) {
 				http.Error(rw, "that token has not been registered", http.StatusUnauthorized)
 				return
 			} else {
+				LOG.Error("error connecting to database", "err", err);
 				http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
-				panic(err)
+				return
 			}
 		}
 	} else {
@@ -150,7 +152,6 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		LOG.Error("error writing notifications to database", "err", err);
 		http.Error(rw, "error writing notifications to database", http.StatusInternalServerError)
-		panic(err)
 	}
 }
 
@@ -168,7 +169,7 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		} else {
 			LOG.Error("error connecting to database", "err", err);
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
-			panic(err)
+			return
 		}
 	}
 
@@ -185,7 +186,7 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		} else {
 			LOG.Error("error connecting to database", "err", err);
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
-			panic(err)
+			return
 		}
 	}
 
@@ -199,22 +200,54 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	patchbody := make(map[string]interface{})
-	JsonFromBody(req, &patchbody)
-	patchfiltered := make(map[string]interface{})
-	if seen, present := patchbody["seen"]; present {
-		patchfiltered["seen"] = seen
+	patchbody := NotificationPatch{}
+	if err = JsonFromBody(req, &patchbody); err != nil {
+		http.Error(rw, "could not parse body", http.StatusBadRequest)
+		return
 	}
-	if read, present := patchbody["read"]; present {
-		patchfiltered["read"] = read
-	}
-	if cleared, present := patchbody["cleared"]; present {
-		patchfiltered["cleared"] = cleared
-	}
-	err = PatchNotification(db, id, patchfiltered)
+
+	err = PatchNotification(db, id, patchbody)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "notification does not exist", http.StatusNotFound)
+		} else {
+			LOG.Error("error connecting to database", "err", err);
+			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
+		}
+	}
+}
+
+func NotificationsPatchAll(rw http.ResponseWriter, req *http.Request) {
+	token := req.FormValue("token")
+	if token == "" {
+		http.Error(rw, "token required to authenticate this request", http.StatusUnauthorized)
+		return
+	}
+	patchbody := BulkNotificationPatch{}
+	if err := JsonFromBody(req, &patchbody); err != nil || len(patchbody.IDs) == 0 ||
+		!(patchbody.Patch.Seen || patchbody.Patch.Read || patchbody.Patch.Cleared) {
+		http.Error(rw, "could not parse body", http.StatusBadRequest)
+	}
+
+	s := SESSION.Copy()
+	defer s.Close()
+	db := Getdb(s)
+
+	reg, err := GetRegistration(db, token)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "token is not registered", http.StatusUnauthorized)
+			return
+		} else {
+			LOG.Error("error connecting to database", "err", err);
+			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err = PatchNotificationsByIdEnsuringUser(db, patchbody.Patch, patchbody.IDs, reg.UserID); err != nil {
+		if err == mgo.ErrNotFound {
+			http.Error(rw, "no registration found with that token", http.StatusUnauthorized)
 		} else {
 			http.Error(rw, "error connecting to database", http.StatusInternalServerError)
 		}
