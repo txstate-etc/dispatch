@@ -113,10 +113,10 @@ func GetUnseenNotificationsForUsers(db *mgo.Database, users []string) (map[strin
 	c := db.C("notifications")
 	idx := mgo.Index{
 		Key: []string{"keys.user_id"},
-		PartialFilter: bson.M{"sent":true, "seen":false},
+		PartialFilter: bson.M{"sent":true, "seen":false, "cleared":false},
 	}
 	c.EnsureIndex(idx)
-	err := c.Find(bson.M{"keys.user_id": bson.M{"$in":users}, "sent":true, "seen":false}).All(&results)
+	err := c.Find(bson.M{"keys.user_id": bson.M{"$in":users}, "sent":true, "seen":false, "cleared":false}).All(&results)
 	ret := map[string][]Notification{}
 	for _,n := range results {
 		ret[n.Keys["user_id"]] = append(ret[n.Keys["user_id"]], n)
