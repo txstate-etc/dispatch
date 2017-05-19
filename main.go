@@ -86,7 +86,7 @@ func main() {
 	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
 	r.HandleFunc("/notifications", NotificationsPatchAll).Methods("PATCH")
 	r.HandleFunc("/notifications/{id}", NotificationsPatch).Methods("PATCH")
-	r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
+	//r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
 	r.HandleFunc("/registrations/{token}", RegistrationsGet).Methods("GET")
@@ -283,6 +283,8 @@ func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// TODO: authenticating by token in here is misguided, we should
+// use the JWT method instead
 func RegistrationsList(rw http.ResponseWriter, req *http.Request) {
 	s := SESSION.Copy()
 	defer s.Close()
