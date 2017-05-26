@@ -145,11 +145,11 @@ func NotificationsCount(rw http.ResponseWriter, req *http.Request) {
 		if err == mgo.ErrNotFound {
 			http.Error(rw, "that token has not been registered", http.StatusUnauthorized)
 			return
+		} else {
+			LOG.Error("error connecting to database", "err", err)
+			http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
+			return
 		}
-	} else {
-		LOG.Error("error connecting to database", "err", err)
-		http.Error(rw, "problem connecting to database", http.StatusInternalServerError)
-		return
 	}
 
 	count, err := GetBadgeCountForRegistration(db, reg)
