@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	"github.com/globalsign/mgo"
 	log "gopkg.in/inconshreveable/log15.v2"
@@ -291,9 +292,20 @@ func NotificationsPatchAll(rw http.ResponseWriter, req *http.Request) {
 
 func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 	nf := NotificationFilter{}
-	JsonFromBody(req, &nf)
+	for key,val := range req.Form {
+		pieces := strings.SplitN(key, ".", 2)
+		if len(pieces) == 2 {
+			if pieces[0] == "keys" {
+				nf.Keys[pieces[1]] = val[0]
+			}
+			if pieces[0] == "other_keys" {
+				nf.OtherKeys[pieces[1]] = val[0]
+			}
+		}
+	}
+
 	if len(nf.Keys) == 0 && len(nf.OtherKeys) == 0 {
-		http.Error(rw, "body must be JSON object with keys to use as filters", http.StatusBadRequest)
+		http.Error(rw, "URL parameters must provide keys to use as filters", http.StatusBadRequest)
 		return
 	}
 	if nf.Keys["provider_id"] == "" {
