@@ -140,6 +140,16 @@ func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 	return ret
 }
 
+func NotificationsRemoveUnseen(notificationarray []Notification) []Notification {
+	ret := []Notification{}
+	for _,n := range notificationarray {
+		if !n.Seen {
+			ret = append(ret, n)
+		}
+	}
+	return ret
+}
+
 func MergeNotifications(db *mgo.Database, notificationarray []Notification) []Notification {
 	ret := []Notification{}
 	for _, n := range notificationarray {
