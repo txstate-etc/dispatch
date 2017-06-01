@@ -95,7 +95,20 @@ func main() {
 	r.HandleFunc("/settings/{token}", SettingsGet).Methods("GET")
 	r.HandleFunc("/settings/{token}", SettingsSet).Methods("POST")
 	if _, err := os.Stat("/ssl/dispatch.cert.pem"); err == nil {
-		err := http.ListenAndServeTLS(":443", "/ssl/dispatch.cert.pem", "/ssl/dispatch.key.pem", r)
+		cfg := &tls.Config{
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		}
+		server := &http.Server{Addr: ":443", Handler: r, TLSConfig: cfg}
+		err := server.ListenAndServeTLS("/ssl/dispatch.cert.pem", "/ssl/dispatch.key.pem")
 		LOG.Crit("could not listen, exiting", "error", err)
 	} else {
 		err := http.ListenAndServe(":80", r)
