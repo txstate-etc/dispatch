@@ -321,7 +321,7 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 	if n.IsUpdate {
 		msg = message.UpdateMessage
 	}
-	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge)
+	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge).Sound("default")
 	notification.CollapseID = GenerateHash(msg)
 
 	client := APNSMANAGER.Get(cert)
