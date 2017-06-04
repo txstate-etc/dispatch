@@ -205,6 +205,12 @@ func NotificationsCreate(rw http.ResponseWriter, req *http.Request) {
 }
 
 func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
+	token := req.FormValue("token")
+	if token == "" {
+		http.Error(rw, "token required to authenticate this request", http.StatusUnauthorized)
+		return
+	}
+
 	s := SESSION.Copy()
 	defer s.Close()
 	db := Getdb(s)
@@ -222,11 +228,6 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	token := req.FormValue("token")
-	if token == "" {
-		http.Error(rw, "token required to authenticate this request", http.StatusUnauthorized)
-		return
-	}
 	reg, err := GetRegistration(db, token)
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -249,11 +250,12 @@ func NotificationsPatch(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	patchbody := NotificationPatch{}
+	patchbody := map[string]interface{}{}
 	if err = JsonFromBody(req, &patchbody); err != nil {
 		http.Error(rw, "could not parse body", http.StatusBadRequest)
 		return
 	}
+	patchbody = CleanNotificationPatch(patchbody)
 
 	err = PatchNotification(db, id, patchbody)
 	if err != nil {
@@ -273,9 +275,12 @@ func NotificationsPatchAll(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	patchbody := BulkNotificationPatch{}
-	if err := JsonFromBody(req, &patchbody); err != nil || len(patchbody.IDs) == 0 ||
-		!(patchbody.Patch.Seen || patchbody.Patch.Read || patchbody.Patch.Cleared) {
+	if err := JsonFromBody(req, &patchbody); err != nil || len(patchbody.IDs) == 0 || len(patchbody.Patch) == 0 {
 		http.Error(rw, "could not parse body", http.StatusBadRequest)
+	}
+	patchbody.Patch = CleanNotificationPatch(patchbody.Patch)
+	if len(patchbody.Patch) == 0 {
+		http.Error(rw, "no valid fields were patched", http.StatusBadRequest)
 	}
 
 	s := SESSION.Copy()

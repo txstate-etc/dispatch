@@ -29,13 +29,22 @@ type NotificationMessage struct {
 	Filter NotificationFilter `json:"filter"`
 }
 
-type NotificationPatch struct {
-	Seen bool `json:"seen"`
-	Read bool `json:"read"`
-	Cleared bool `json:"cleared"`
-}
-
 type BulkNotificationPatch struct {
 	IDs []bson.ObjectId `json:"ids"`
-	Patch NotificationPatch `json:"patches"`
+	Patch map[string]interface{} `json:"patches"`
+}
+
+func CleanNotificationPatch(patch map[string]interface{}) map[string]interface{} {
+	validKeys := map[string]bool {
+		"read":true,
+		"seen":true,
+		"cleared":true,
+	}
+	ret := map[string]interface{}{}
+	for key,val := range patch {
+		if validKeys[key] {
+			ret[key] = val
+		}
+	}
+	return ret
 }

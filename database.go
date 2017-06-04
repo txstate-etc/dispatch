@@ -188,7 +188,7 @@ func PatchNotification(db *mgo.Database, id string, newdata interface{}) error {
 	return db.C("notifications").UpdateId(bson.ObjectIdHex(id), bson.M{"$set":newdata})
 }
 
-func PatchNotificationsByIdEnsuringUser(db *mgo.Database, patch NotificationPatch, ids []bson.ObjectId, userid string) error {
+func PatchNotificationsByIdEnsuringUser(db *mgo.Database, patch interface{}, ids []bson.ObjectId, userid string) error {
 	_,err := db.C("notifications").UpdateAll(bson.M{"keys.user_id":userid, "_id":bson.M{"$in":ids}}, bson.M{"$set":patch})
 	return err
 }
