@@ -82,6 +82,11 @@ func JsonFromBody(req *http.Request, ret interface{}) error {
 }
 
 func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
+	if err := MarkNotificationDupes(db, n); err != nil {
+		LOG.Crit("lost a notification because database was down")
+		return Notification{}, true
+	}
+
 	result, err := GetNotificationDupe(db, n)
 	if err != nil && err != mgo.ErrNotFound {
 		LOG.Crit("lost a notification because database was down")

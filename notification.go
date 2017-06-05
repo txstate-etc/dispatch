@@ -9,6 +9,7 @@ type Notification struct {
 	Seen bool `json:"seen"`
 	Read bool `json:"read"`
 	Cleared bool `json:"cleared"`
+	Replaced bool `json:"replaced"`
 	IsUpdate bool `json:"is_update" bson:"is_update"`
 	Errors bool `json:"errors"`
 	ContentHash string `json:"content_hash"`

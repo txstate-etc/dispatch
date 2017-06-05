@@ -65,6 +65,13 @@ func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error)
 	return result, err
 }
 
+func MarkNotificationDupes(db *mgo.Database, n Notification) error {
+	c := db.C("notifications")
+	c.EnsureIndexKey(MapKeys(n.Keys)...)
+	_,err := c.UpdateAll(n.Keys, bson.M{"$set":bson.M{"replaced":true}})
+	return err
+}
+
 func GetNotificationsUnsent(db *mgo.Database) ([]Notification, error) {
 	results := make([]Notification, 0)
 	c := db.C("notifications")
@@ -82,10 +89,10 @@ func GetNotificationsForUser(db *mgo.Database, user string) ([]Notification, err
 	c := db.C("notifications")
 	idx := mgo.Index{
 		Key: []string{"keys.user_id", "notify_after"},
-		PartialFilter: bson.M{"sent":true, "cleared":false},
+		PartialFilter: bson.M{"sent":true, "cleared":false, "replaced":false},
 	}
 	c.EnsureIndex(idx)
-	err := c.Find(bson.M{"keys.user_id": user, "sent":true, "cleared":false}).Sort("-notify_after").All(&results)
+	err := c.Find(bson.M{"keys.user_id": user, "sent":true, "cleared":false, "replaced":false}).Sort("-notify_after").All(&results)
 	return NotificationsRemoveDupes(results), err
 }
 
@@ -113,10 +120,10 @@ func GetNotificationsForUsers(db *mgo.Database, users []string) (map[string][]No
 	c := db.C("notifications")
 	idx := mgo.Index{
 		Key: []string{"keys.user_id"},
-		PartialFilter: bson.M{"sent":true, "cleared":false},
+		PartialFilter: bson.M{"sent":true, "cleared":false, "replaced":false},
 	}
 	c.EnsureIndex(idx)
-	err := c.Find(bson.M{"keys.user_id": bson.M{"$in":users}, "sent":true, "cleared":false}).All(&results)
+	err := c.Find(bson.M{"keys.user_id": bson.M{"$in":users}, "sent":true, "cleared":false, "replaced":false}).All(&results)
 	ret := map[string][]Notification{}
 	for _,n := range results {
 		ret[n.Keys["user_id"]] = append(ret[n.Keys["user_id"]], n)
