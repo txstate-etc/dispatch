@@ -88,6 +88,7 @@ func main() {
 	r.HandleFunc("/notifications", NotificationsDelete).Methods("DELETE")
 	r.HandleFunc("/notifications", NotificationsPatchAll).Methods("PATCH")
 	r.HandleFunc("/notifications/{id}", NotificationsPatch).Methods("PATCH")
+	r.HandleFunc("/notifications/{id}", NotificationsPatch).Methods("POST")
 	//r.HandleFunc("/registrations", RegistrationsList).Methods("GET")
 	r.HandleFunc("/registrations", RegistrationsCreate).Methods("POST")
 	r.HandleFunc("/registrations", RegistrationsDelete).Methods("DELETE")
