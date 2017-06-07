@@ -312,6 +312,9 @@ func NotificationsPatchAll(rw http.ResponseWriter, req *http.Request) {
 
 func NotificationsDelete(rw http.ResponseWriter, req *http.Request) {
 	nf := NotificationFilter{}
+	nf.Keys = map[string]string{}
+	nf.OtherKeys = map[string]string{}
+	req.ParseForm()
 	for key,val := range req.Form {
 		pieces := strings.SplitN(key, ".", 2)
 		if len(pieces) == 2 {
