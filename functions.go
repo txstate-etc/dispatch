@@ -360,6 +360,8 @@ func SendAndroidNotification(reg Registration, n Notification, message Notificat
 
 	notification := &fcm.NotificationPayload{
 		Body: msg,
+		Title: "TRACS Mobile",
+		Sound: "default",
 	}
 
 	data := map[string]string{
