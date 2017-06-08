@@ -65,9 +65,9 @@ func DupeSelector(keys map[string]string) map[string]string {
 	return ret
 }
 
-func IndexKeysForMap(keys map[string]interface{}) []string {
+func IndexKeysForMap(keys map[string]string) []string {
 	indexkeys := []string{}
-	for key,_ := range n.Keys {
+	for key,_ := range keys {
 		indexkeys = append(indexkeys, "key."+key)
 	}
 	return indexkeys
