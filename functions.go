@@ -82,11 +82,6 @@ func JsonFromBody(req *http.Request, ret interface{}) error {
 }
 
 func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
-	if err := MarkNotificationDupes(db, n); err != nil {
-		LOG.Crit("lost a notification because database was down")
-		return Notification{}, true
-	}
-
 	result, err := GetNotificationDupe(db, n)
 	if err != nil && err != mgo.ErrNotFound {
 		LOG.Crit("lost a notification because database was down")
@@ -94,7 +89,7 @@ func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
 	}
 
 	killnotification := false
-	if err == nil { // found a duplicate
+	if result.ID != "" { // found a duplicate
 		if result.Sent { // the older one has already gone out
 			if result.ContentHash == n.ContentHash { // content has not changed
 				killnotification = true // no new notification
@@ -107,6 +102,14 @@ func MergeNotification(db *mgo.Database, n Notification) (Notification, bool) {
 			}
 		} else { // the older one has not gone out
 			n.ID = result.ID // update the older notification with new data
+		}
+	}
+
+	// if we are making a new notification, mark existing duplicates as replaced
+	if n.ID == "" && !killnotification {
+		if err := MarkNotificationDupes(db, n); err != nil {
+			LOG.Crit("lost a notification because database was down")
+			return Notification{}, true
 		}
 	}
 	return n, killnotification

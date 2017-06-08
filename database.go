@@ -57,18 +57,35 @@ func GetNotification(db *mgo.Database, nid string) (Notification, error) {
 	return result, err
 }
 
+func DupeSelector(keys map[string]string) map[string]string {
+	ret := map[string]string{}
+	for key,val := range keys {
+		ret["keys."+key] = val
+	}
+	return ret
+}
+
+func IndexKeysForMap(keys map[string]interface{}) []string {
+	indexkeys := []string{}
+	for key,_ := range n.Keys {
+		indexkeys = append(indexkeys, "key."+key)
+	}
+	return indexkeys
+}
+
 func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
 	result := Notification{}
 	c := db.C("notifications")
-	c.EnsureIndexKey(MapKeys(n.Keys, "keys.")...)
-	err := c.Find(bson.M{"keys":n.Keys}).Sort("-notify_after").One(&result)
+	if err := c.EnsureIndexKey(IndexKeysForMap(n.Keys)...); err != nil {
+		LOG.Crit("error creating index", "err", err)
+	}
+	err := c.Find(DupeSelector(n.Keys)).Sort("-notify_after").One(&result)
 	return result, err
 }
 
 func MarkNotificationDupes(db *mgo.Database, n Notification) error {
 	c := db.C("notifications")
-	c.EnsureIndexKey(MapKeys(n.Keys, "keys.")...)
-	_,err := c.UpdateAll(bson.M{"keys":n.Keys}, bson.M{"$set":bson.M{"replaced":true}})
+	_,err := c.UpdateAll(DupeSelector(n.Keys), bson.M{"$set":bson.M{"replaced":true}})
 	return err
 }
 
