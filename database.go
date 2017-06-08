@@ -60,15 +60,15 @@ func GetNotification(db *mgo.Database, nid string) (Notification, error) {
 func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
 	result := Notification{}
 	c := db.C("notifications")
-	c.EnsureIndexKey(MapKeys(n.Keys)...)
-	err := c.Find(n.Keys).Sort("-notify_after").One(&result)
+	c.EnsureIndexKey(MapKeys(n.Keys, "keys.")...)
+	err := c.Find(bson.M{"keys":n.Keys}).Sort("-notify_after").One(&result)
 	return result, err
 }
 
 func MarkNotificationDupes(db *mgo.Database, n Notification) error {
 	c := db.C("notifications")
-	c.EnsureIndexKey(MapKeys(n.Keys)...)
-	_,err := c.UpdateAll(n.Keys, bson.M{"$set":bson.M{"replaced":true}})
+	c.EnsureIndexKey(MapKeys(n.Keys, "keys.")...)
+	_,err := c.UpdateAll(bson.M{"keys":n.Keys}, bson.M{"$set":bson.M{"replaced":true}})
 	return err
 }
 

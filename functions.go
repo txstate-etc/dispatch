@@ -51,13 +51,13 @@ func GenerateHash(content string) string {
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
-func MapKeys(mymap interface{}) []string {
+func MapKeys(mymap interface{}, prefix string) []string {
 	v := reflect.ValueOf(mymap)
 	if v.Kind() == reflect.Map {
 		rkeys := v.MapKeys()
 		ret := make([]string, len(rkeys))
 		for _, kv := range rkeys {
-			ret = append(ret, kv.String())
+			ret = append(ret, prefix+kv.String())
 		}
 		return ret
 	}
