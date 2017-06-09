@@ -13,7 +13,7 @@ func GetAllAppFilters(db *mgo.Database) ([]AppFilter, error) {
 	results := make([]AppFilter, 0)
 
 	// TEMPORARY: hack in our configuration
-	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{NotificationFilter{Keys: map[string]string{"provider_id":"tracs"}}}})
+	results = append(results, AppFilter{AppID: "edu.txstate.mobile.tracs", Whitelist: []NotificationFilter{NotificationFilter{Keys: map[string]string{"provider_id":"tracs", "object_type":"announcement"}}}})
 	//db.C("appfilters").Find().All(&results)
 
 	return results, nil
