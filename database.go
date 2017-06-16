@@ -3,6 +3,7 @@ import (
 	"time"
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+	"sort"
 )
 
 func Getdb(s *mgo.Session) *mgo.Database {
@@ -74,6 +75,7 @@ func IndexKeysForMap(keys map[string]string) []string {
 	for key,_ := range keys {
 		indexkeys = append(indexkeys, "key."+key)
 	}
+	sort.Strings(indexkeys)
 	return indexkeys
 }
 
