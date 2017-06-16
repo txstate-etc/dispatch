@@ -32,19 +32,23 @@ func GetAppFilter(db *mgo.Database, appid string) (AppFilter, error) {
 	return ret, nil
 }
 
-// TEMPORARY: hacked to have our configuration hard-coded
 func GetAppFilters(db *mgo.Database, appids []string) (map[string]AppFilter, error) {
+	hash := map[string]bool{}
+	for _,app := range appids {
+		hash[app] = true
+	}
+	return GetAppFiltersWithHash(db, hash)
+}
+
+// TEMPORARY: hacked to have our configuration hard-coded
+func GetAppFiltersWithHash(db *mgo.Database, appidhash map[string]bool) (map[string]AppFilter, error) {
 	ret := map[string]AppFilter{}
 	filters, err := GetAllAppFilters(db)
 	if err != nil {
 		return ret, err
 	}
-	hash := map[string]bool{}
-	for _,app := range appids {
-		hash[app] = true
-	}
 	for _,filter := range filters {
-		if hash[filter.AppID] {
+		if appidhash[filter.AppID] {
 			ret[filter.AppID] = filter
 		}
 	}
@@ -158,11 +162,15 @@ func GetBadgeCountsForRegistrations(db *mgo.Database, regs []Registration) (map[
 	if err != nil {
 		return ret, err
 	}
+	return GetBadgeCounts(db, regs, notis, appfilters)
+}
 
+func GetBadgeCounts(db *mgo.Database, regs []Registration, notis map[string][]Notification, appfilters map[string]AppFilter) (map[string]int, error) {
+	ret := map[string]int{}
 	for _,r := range regs {
 		filtered := FilterNotificationsForRegistration(notis[r.UserID], appfilters[r.AppID], r)
 		filtered = NotificationsRemoveDupes(filtered)
-		filtered = NotificationsRemoveUnseen(filtered)
+		filtered = NotificationsRemoveSeen(filtered)
 		ret[r.Token] = len(filtered)
 	}
 	return ret, nil

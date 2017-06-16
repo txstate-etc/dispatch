@@ -148,7 +148,7 @@ func NotificationsRemoveDupes(notificationarray []Notification) []Notification {
 	return ret
 }
 
-func NotificationsRemoveUnseen(notificationarray []Notification) []Notification {
+func NotificationsRemoveSeen(notificationarray []Notification) []Notification {
 	ret := []Notification{}
 	for _,n := range notificationarray {
 		if !n.Seen {
@@ -256,27 +256,48 @@ func SendNotificationArray(db *mgo.Database, notificationarray []Notification) e
 		return nil
 	}
 	userids := make([]string, len(notificationarray))
+	notisbyuser := map[string][]Notification{}
 	for _, n := range notificationarray {
 		userids = append(userids, n.Keys["user_id"])
+		notisbyuser[n.Keys["user_id"]] = append(notisbyuser[n.Keys["user_id"]], n)
 	}
 	registrations, err := GetRegistrationsForUsers(db, userids)
 	if err != nil {
 		return err
 	}
 	flatregs := []Registration{}
+	appidhash := map[string]bool{}
 	for _, regs := range registrations {
 		for _, r := range regs {
 			flatregs = append(flatregs, r)
+			appidhash[r.AppID] = true
 		}
 	}
 	appfilters, err := GetAllAppFilters(db)
 	if err != nil {
 		return err
 	}
+	appfiltershash, err := GetAppFiltersWithHash(db, appidhash)
+	if err != nil {
+		return err
+	}
+
 	badgecounts, err := GetBadgeCountsForRegistrations(db, flatregs)
 	if err != nil {
 		return err
 	}
+
+	// we are about to send a batch of notifications that are marked unsent, but
+	// GetBadgeCountsForRegistrations counts notifications that are already sent
+	// we need to add badge counts for the notifications we are about to push out
+	morebadgecounts, err := GetBadgeCounts(db, flatregs, notisbyuser, appfiltershash)
+	if err != nil {
+		return err
+	}
+	for token,count := range morebadgecounts {
+		badgecounts[token] += count
+	}
+
 	var messages []NotificationMessage
 	provider, present := notificationarray[0].Keys["provider_id"]
 	if present {
@@ -346,7 +367,7 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 	if res.StatusCode == http.StatusGone { // apple is telling us the device is no longer registered
 		DeleteRegistrationWithNewSession(reg)
 	}
-	LOG.Info("successfully pushed to Apple", "n", n, "statusCode", res.StatusCode, "ApnsID", res.ApnsID, "Reason", res.Reason)
+	LOG.Info("successfully pushed to Apple", "n", n, "statusCode", res.StatusCode, "ApnsID", res.ApnsID, "Reason", res.Reason, "badge", badge)
 	return nil
 }
 
