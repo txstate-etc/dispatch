@@ -1,6 +1,7 @@
 package main
 import (
 	"github.com/globalsign/mgo/bson"
+	"encoding/json"
 )
 
 type Notification struct {
@@ -48,4 +49,9 @@ func CleanNotificationPatch(patch map[string]interface{}) map[string]interface{}
 		}
 	}
 	return ret
+}
+
+func (n Notification) CollapseID() string {
+	bytes,_ := json.Marshal(n.Keys)
+	return GenerateHash(string(bytes))
 }

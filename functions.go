@@ -354,7 +354,7 @@ func SendAppleNotification(reg Registration, n Notification, message Notificatio
 		msg = message.UpdateMessage
 	}
 	notification.Payload = payload.NewPayload().Alert(msg).Badge(badge).Sound("default")
-	notification.CollapseID = GenerateHash(msg)
+	notification.CollapseID = n.CollapseID()
 
 	client := APNSMANAGER.Get(cert)
 	if Getenv("DISPATCH_ENVIRONMENT", "development") == "production" {
