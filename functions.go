@@ -33,6 +33,9 @@ func LoopForNotificationsToSend(seconds time.Duration) {
 			}
 		}
 
+		DeleteNotificationsReplaced(db)
+		DeleteNotificationsOld(db)
+
 		time.Sleep(seconds)
 	}
 }

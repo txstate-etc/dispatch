@@ -98,11 +98,7 @@ func MarkNotificationDupes(db *mgo.Database, n Notification) error {
 func GetNotificationsUnsent(db *mgo.Database) ([]Notification, error) {
 	results := make([]Notification, 0)
 	c := db.C("notifications")
-	idx := mgo.Index{
-		Key: []string{"notify_after"},
-		PartialFilter: bson.M{"sent":false},
-	}
-	c.EnsureIndex(idx)
+	c.EnsureIndexKey("sent", "notify_after")
 	err := c.Find(bson.M{"sent": false, "notify_after": bson.M{"$lt": time.Now()}}).All(&results)
 	return results, err
 }
@@ -231,6 +227,25 @@ func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 	}
 
 	_, err := db.C("notifications").RemoveAll(filters)
+	return err
+}
+
+func DeleteNotificationsReplaced(db *mgo.Database) error {
+	c := db.C("notifications")
+	idx := mgo.Index{
+		Key: []string{"replaced"},
+		PartialFilter: bson.M{"replaced":true},
+	}
+	c.EnsureIndex(idx)
+	_,err := c.RemoveAll(bson.M{"replaced":true})
+	return err
+}
+
+func DeleteNotificationsOld(db *mgo.Database) error {
+	expireDate := time.Now().AddDate(0,0,-14)
+	c := db.C("notifications")
+	c.EnsureIndexKey("sent", "notify_after")
+	_,err := c.RemoveAll(bson.M{"sent":true, "notify_after": bson.M{ "$lt": expireDate }})
 	return err
 }
 
