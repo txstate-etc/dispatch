@@ -73,7 +73,7 @@ func DupeSelector(keys map[string]string) map[string]string {
 func IndexKeysForMap(keys map[string]string) []string {
 	indexkeys := []string{}
 	for key,_ := range keys {
-		indexkeys = append(indexkeys, "key."+key)
+		indexkeys = append(indexkeys, "keys."+key)
 	}
 	sort.Strings(indexkeys)
 	return indexkeys
