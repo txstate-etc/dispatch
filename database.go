@@ -70,10 +70,19 @@ func DupeSelector(keys map[string]string) map[string]string {
 	return ret
 }
 
-func IndexKeysForMap(keys map[string]string) []string {
-	indexkeys := []string{}
+func IndexKeysFromKeys(keys map[string]string) []string {
+	indexkeys := make([]string, len(keys))
 	for key,_ := range keys {
 		indexkeys = append(indexkeys, "keys."+key)
+	}
+	sort.Strings(indexkeys)
+	return indexkeys
+}
+
+func IndexKeysFromBsonM(keys bson.M) []string {
+	indexkeys := make([]string, len(keys))
+	for key,_ := range keys {
+		indexkeys = append(indexkeys, key)
 	}
 	sort.Strings(indexkeys)
 	return indexkeys
@@ -82,7 +91,7 @@ func IndexKeysForMap(keys map[string]string) []string {
 func GetNotificationDupe(db *mgo.Database, n Notification) (Notification, error) {
 	result := Notification{}
 	c := db.C("notifications")
-	if err := c.EnsureIndexKey(IndexKeysForMap(n.Keys)...); err != nil {
+	if err := c.EnsureIndexKey(IndexKeysFromKeys(n.Keys)...); err != nil {
 		LOG.Crit("error creating index", "err", err)
 	}
 	err := c.Find(DupeSelector(n.Keys)).Sort("-notify_after").One(&result)
@@ -225,7 +234,10 @@ func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 	for key,val := range nf.OtherKeys {
 		filters["otherkeys."+key] = val
 	}
-
+	c := db.C("notifications")
+	if err := c.EnsureIndexKey(IndexKeysFromBsonM(filters)...); err != nil {
+		LOG.Crit("error creating index", "err", err)
+	}
 	_, err := db.C("notifications").RemoveAll(filters)
 	return err
 }
