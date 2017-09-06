@@ -80,7 +80,7 @@ func IndexKeysFromKeys(keys map[string]string) []string {
 }
 
 func IndexKeysFromBsonM(keys bson.M) []string {
-	indexkeys := make([]string, len(keys))
+	indexkeys := make([]string, 0, len(keys))
 	for key,_ := range keys {
 		indexkeys = append(indexkeys, key)
 	}
@@ -236,7 +236,7 @@ func DeleteNotifications(db *mgo.Database, nf NotificationFilter) error {
 	}
 	c := db.C("notifications")
 	if err := c.EnsureIndexKey(IndexKeysFromBsonM(filters)...); err != nil {
-		LOG.Crit("error creating index", "err", err)
+		LOG.Crit("error creating index", "err", err, "filters", filters)
 	}
 	_, err := db.C("notifications").RemoveAll(filters)
 	return err
