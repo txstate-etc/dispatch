@@ -1,4 +1,4 @@
-FROM golang:1.8.0-alpine
+FROM golang:1-alpine
 RUN apk add --update git ca-certificates
 
 COPY . /go/src/dispatch
