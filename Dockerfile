@@ -1,5 +1,6 @@
 FROM golang:1-alpine
 RUN apk add --update git ca-certificates
+RUN apk --update add alpine-sdk
 
 COPY . /go/src/dispatch
 WORKDIR /go/src/dispatch
